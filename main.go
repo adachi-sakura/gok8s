@@ -1,7 +1,6 @@
 package main
 import (
 	"github.com/gin-gonic/gin"
-	"context"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,7 +24,7 @@ func main() {
 		c.String(http.StatusOK, "PONG")
 	})
 	router.GET("/pods", func(c *gin.Context) {
-		pods, err := clientSet.CoreV1().Pods("").List(context.TODO(), metav1.ListOptions{})
+		pods, err := clientSet.CoreV1().Pods("").List(metav1.ListOptions{})
 		if err != nil {
 			c.JSON(http.StatusBadRequest, err)
 			return
@@ -34,7 +33,7 @@ func main() {
 
 	})
 	router.GET("/first-pod", func(c *gin.Context) {
-		pods, err := clientSet.CoreV1().Pods("").List(context.TODO(), metav1.ListOptions{})
+		pods, err := clientSet.CoreV1().Pods("").List(metav1.ListOptions{})
 		if err != nil {
 			c.JSON(http.StatusBadRequest, err)
 			return
@@ -48,7 +47,7 @@ func main() {
 			c.JSON(http.StatusBadRequest, err)
 			return
 		}
-		result, err := clientSet.AppsV1().Deployments(apiv1.NamespaceDefault).Create(context.TODO(), deployment, metav1.CreateOptions{})
+		result, err := clientSet.AppsV1().Deployments(apiv1.NamespaceDefault).Create(deployment)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, err)
 			return
