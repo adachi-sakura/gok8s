@@ -14,16 +14,14 @@ func main() {
 	if err != nil {
 		panic(err.Error())
 	}
-	clientSet, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		panic(err.Error())
-	}
+	var clientSet *kubernetes.Clientset
+
 
 	router := gin.Default()
 	router.GET("/ping", func(c *gin.Context) {
 		c.String(http.StatusOK, "PONG")
 	})
-	router.GET("/pods", func(c *gin.Context) {
+	router.GET("/pods", DynamicClientSet(config, clientSet), func(c *gin.Context) {
 		pods, err := clientSet.CoreV1().Pods("").List(metav1.ListOptions{})
 		if err != nil {
 			c.JSON(http.StatusBadRequest, err)
@@ -32,7 +30,7 @@ func main() {
 		c.JSON(http.StatusOK, pods)
 
 	})
-	router.GET("/first-pod", func(c *gin.Context) {
+	router.GET("/first-pod", DynamicClientSet(config, clientSet), func(c *gin.Context) {
 		pods, err := clientSet.CoreV1().Pods("").List(metav1.ListOptions{})
 		if err != nil {
 			c.JSON(http.StatusBadRequest, err)
@@ -41,7 +39,7 @@ func main() {
 		c.JSON(http.StatusOK, pods.Items[0])
 
 	})
-	router.POST("/deployments", func(c * gin.Context) {
+	router.POST("/deployments", DynamicClientSet(config, clientSet), func(c * gin.Context) {
 		deployment := &appsv1.Deployment{}
 		if err := c.Bind(deployment); err != nil {
 			c.JSON(http.StatusBadRequest, err)
@@ -55,4 +53,21 @@ func main() {
 		c.JSON(http.StatusCreated, result)
 	})
 	router.Run(":8080")
+}
+
+func DynamicClientSet(config *rest.Config, clientSet *kubernetes.Clientset) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		token := c.Request.Header.Get("Token")
+		if token == "" {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, "token need")
+			return
+		}
+		config.BearerTokenFile = ""
+		config.BearerToken = token
+
+		var err error
+		if clientSet, err = kubernetes.NewForConfig(config); err != nil {
+			panic(err.Error())
+		}
+	}
 }
