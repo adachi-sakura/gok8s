@@ -1,12 +1,19 @@
 package main
 import (
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	apiv1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/tools/clientcmd/api"
 	"net/http"
+)
+
+const (
+	DefaultCmdConfigName = "kubernetes"
 )
 
 func main() {
@@ -14,23 +21,26 @@ func main() {
 	if err != nil {
 		panic(err.Error())
 	}
-	var clientSet *kubernetes.Clientset
+	fmt.Printf("initial config token: %s\ntokenfile: %s", config.BearerToken, config.BearerTokenFile)
+	clientSet := &kubernetes.Clientset{}
 
 
 	router := gin.Default()
 	router.GET("/ping", func(c *gin.Context) {
 		c.String(http.StatusOK, "PONG")
 	})
-	router.GET("/pods", DynamicClientSet(config, clientSet), func(c *gin.Context) {
-		pods, err := clientSet.CoreV1().Pods("").List(metav1.ListOptions{})
+	router.GET("/admin/first-pod", func(c *gin.Context) {
+		config, err := rest.InClusterConfig()
 		if err != nil {
-			c.JSON(http.StatusBadRequest, err)
-			return
+			fmt.Println("error occurred in cluster config...")
+			panic(err.Error())
 		}
-		c.JSON(http.StatusOK, pods)
-
-	})
-	router.GET("/first-pod", DynamicClientSet(config, clientSet), func(c *gin.Context) {
+		clientSet, err := kubernetes.NewForConfig(config)
+		if err != nil {
+			fmt.Println("error occurred in clientSet creating...")
+			panic(err.Error())
+		}
+		fmt.Printf("ClientSet: %v\n", clientSet)
 		pods, err := clientSet.CoreV1().Pods("").List(metav1.ListOptions{})
 		if err != nil {
 			c.JSON(http.StatusBadRequest, err)
@@ -39,7 +49,36 @@ func main() {
 		c.JSON(http.StatusOK, pods.Items[0])
 
 	})
-	router.POST("/deployments", DynamicClientSet(config, clientSet), func(c * gin.Context) {
+	router.GET("/pods", DynamicClientSet(config, &clientSet), func(c *gin.Context) {
+		pods, err := clientSet.CoreV1().Pods("").List(metav1.ListOptions{})
+		if err != nil {
+			c.JSON(http.StatusBadRequest, err)
+			return
+		}
+		c.JSON(http.StatusOK, pods)
+
+	})
+	router.GET("/first-pod", DynamicClientSet(config, &clientSet), func(c *gin.Context) {
+		fmt.Printf("clientSet used: %v\n", *clientSet)
+		pods, err := clientSet.CoreV1().Pods("").List(metav1.ListOptions{})
+		if err != nil {
+			c.JSON(http.StatusBadRequest, err)
+			return
+		}
+		c.JSON(http.StatusOK, pods.Items[0])
+
+	})
+	router.GET("/test/first-pod", DyClientSet(config, &clientSet), func(c *gin.Context) {
+		fmt.Printf("clientSet used: %v\n", *clientSet)
+		pods, err := clientSet.CoreV1().Pods("").List(metav1.ListOptions{})
+		if err != nil {
+			c.JSON(http.StatusBadRequest, err)
+			return
+		}
+		c.JSON(http.StatusOK, pods.Items[0])
+
+	})
+	router.POST("/deployments", DynamicClientSet(config, &clientSet), func(c * gin.Context) {
 		deployment := &appsv1.Deployment{}
 		if err := c.Bind(deployment); err != nil {
 			c.JSON(http.StatusBadRequest, err)
@@ -55,7 +94,7 @@ func main() {
 	router.Run(":8080")
 }
 
-func DynamicClientSet(config *rest.Config, clientSet *kubernetes.Clientset) gin.HandlerFunc {
+func DyClientSet(config *rest.Config, clientSet **kubernetes.Clientset) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token := c.Request.Header.Get("Token")
 		if token == "" {
@@ -64,10 +103,75 @@ func DynamicClientSet(config *rest.Config, clientSet *kubernetes.Clientset) gin.
 		}
 		config.BearerTokenFile = ""
 		config.BearerToken = token
-
 		var err error
-		if clientSet, err = kubernetes.NewForConfig(config); err != nil {
+		if *clientSet, err = kubernetes.NewForConfig(config); err != nil {
+			fmt.Println("error occurred in clientSet creating...")
 			panic(err.Error())
 		}
+		fmt.Printf("clientSet created: %v\n", *clientSet)
 	}
+}
+
+func DynamicClientSet(config *rest.Config, clientSet **kubernetes.Clientset) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		token := c.Request.Header.Get("Token")
+		if token == "" {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, "token need")
+			return
+		}
+		authInfo := &api.AuthInfo{
+			Token: token,
+		}
+
+		//var err error
+		//if config, err = rest.InClusterConfig(); err != nil {
+		//	fmt.Printf("error occurred in cluster config...")
+		//	panic(err.Error())
+		//}
+		clientConfig := BuildCmdConfig(authInfo, config)
+		cfg, err := clientConfig.ClientConfig()
+		if err != nil {
+			fmt.Printf("error occurred in client config...")
+			panic(err.Error())
+		}
+
+		*clientSet, err = kubernetes.NewForConfig(cfg)
+		if err != nil {
+			fmt.Printf("error occurred in client set...")
+			panic(err.Error())
+		}
+		fmt.Printf("clientSet created: %v\n", *clientSet)
+
+		//config.BearerTokenFile = ""
+		//config.BearerToken = token
+
+		//fmt.Println("Before create clientSet...")
+		//var err error
+		//if clientSet, err = kubernetes.NewForConfig(config); err != nil {
+		//	fmt.Println("error occurred in clientSet creating...")
+		//	panic(err.Error())
+		//}
+		//fmt.Printf("Dynamic ClientSet: %v\n", clientSet)
+	}
+}
+
+func BuildCmdConfig( authInfo *api.AuthInfo, cfg *rest.Config) clientcmd.ClientConfig {
+	cmdCfg := api.NewConfig()
+	cmdCfg.Clusters[DefaultCmdConfigName] = &api.Cluster{
+		Server:                   cfg.Host,
+		CertificateAuthority:     cfg.TLSClientConfig.CAFile,
+		CertificateAuthorityData: cfg.TLSClientConfig.CAData,
+		InsecureSkipTLSVerify:    cfg.TLSClientConfig.Insecure,
+	}
+	cmdCfg.AuthInfos[DefaultCmdConfigName] = authInfo
+	cmdCfg.Contexts[DefaultCmdConfigName] = &api.Context{
+		Cluster:  DefaultCmdConfigName,
+		AuthInfo: DefaultCmdConfigName,
+	}
+	cmdCfg.CurrentContext = DefaultCmdConfigName
+
+	return clientcmd.NewDefaultClientConfig(
+		*cmdCfg,
+		&clientcmd.ConfigOverrides{},
+	)
 }
