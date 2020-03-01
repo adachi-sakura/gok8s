@@ -8,6 +8,7 @@ require (
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0 // indirect
 	k8s.io/api v0.17.3
 	k8s.io/apimachinery v0.17.3
-	k8s.io/client-go v0.17.0
+	k8s.io/client-go v0.17.3
+	k8s.io/metrics v0.17.3
 	k8s.io/utils v0.0.0-20200124190032-861946025e34 // indirect
 )

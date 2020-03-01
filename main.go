@@ -1,14 +1,16 @@
 package main
 import (
 	"fmt"
+	"github.com/buzaiguna/gok8s/utils"
 	"github.com/gin-gonic/gin"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	apiv1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
+	metricsclientset "k8s.io/metrics/pkg/client/clientset/versioned"
 	"net/http"
 )
 
@@ -19,7 +21,7 @@ const (
 func main() {
 	config, err := rest.InClusterConfig()
 	if err != nil {
-		panic(err.Error())
+		panic(err)
 	}
 	fmt.Printf("initial config token: %s\ntokenfile: %s", config.BearerToken, config.BearerTokenFile)
 	clientSet := &kubernetes.Clientset{}
@@ -33,12 +35,12 @@ func main() {
 		config, err := rest.InClusterConfig()
 		if err != nil {
 			fmt.Println("error occurred in cluster config...")
-			panic(err.Error())
+			panic(err)
 		}
 		clientSet, err := kubernetes.NewForConfig(config)
 		if err != nil {
 			fmt.Println("error occurred in clientSet creating...")
-			panic(err.Error())
+			panic(err)
 		}
 		fmt.Printf("ClientSet: %v\n", clientSet)
 		pods, err := clientSet.CoreV1().Pods("").List(metav1.ListOptions{})
@@ -52,7 +54,7 @@ func main() {
 	router.GET("/pods", DynamicClientSet(config, &clientSet), func(c *gin.Context) {
 		pods, err := clientSet.CoreV1().Pods("").List(metav1.ListOptions{})
 		if err != nil {
-			c.JSON(http.StatusBadRequest, err)
+			c.JSON(http.StatusBadRequest, err.Error())
 			return
 		}
 		c.JSON(http.StatusOK, pods)
@@ -62,7 +64,7 @@ func main() {
 		fmt.Printf("clientSet used: %v\n", *clientSet)
 		pods, err := clientSet.CoreV1().Pods("").List(metav1.ListOptions{})
 		if err != nil {
-			c.JSON(http.StatusBadRequest, err)
+			c.JSON(http.StatusBadRequest, err.Error())
 			return
 		}
 		c.JSON(http.StatusOK, pods.Items[0])
@@ -72,21 +74,52 @@ func main() {
 		fmt.Printf("clientSet used: %v\n", *clientSet)
 		pods, err := clientSet.CoreV1().Pods("").List(metav1.ListOptions{})
 		if err != nil {
-			c.JSON(http.StatusBadRequest, err)
+			c.JSON(http.StatusBadRequest, err.Error())
 			return
 		}
 		c.JSON(http.StatusOK, pods.Items[0])
 
 	})
+	router.GET("/metrics/nodes", DyClientSet(config, &clientSet), func(c *gin.Context) {
+		metricsClientSet, err := metricsclientset.NewForConfig(config)
+		if err != nil {
+			fmt.Printf("error occurred in metrics client set creating...")
+			panic(err)
+		}
+		metrics, err := metricsClientSet.MetricsV1beta1().NodeMetricses().List(metav1.ListOptions{})
+		if err != nil {
+			fmt.Printf("error occurred in metrics list...")
+			c.JSON(http.StatusBadRequest, err.Error())
+		}
+		c.JSON(http.StatusOK, metrics)
+
+	})
+	router.GET("/metrics/pods", DyClientSet(config, &clientSet), func(c *gin.Context) {
+		metricsClientSet, err := metricsclientset.NewForConfig(config)
+		if err != nil {
+			fmt.Printf("error occurred in metrics client set creating...")
+			panic(err)
+		}
+		metrics, err := metricsClientSet.MetricsV1beta1().PodMetricses(metav1.NamespaceDefault).List(metav1.ListOptions{})
+		if err != nil {
+			fmt.Printf("error occurred in metrics list...")
+			c.JSON(http.StatusBadRequest, err.Error())
+		}
+		c.JSON(http.StatusOK, metrics)
+
+	})
 	router.POST("/deployments", DynamicClientSet(config, &clientSet), func(c * gin.Context) {
 		deployment := &appsv1.Deployment{}
-		if err := c.Bind(deployment); err != nil {
-			c.JSON(http.StatusBadRequest, err)
+		if err := utils.Bind(c, deployment); err != nil {
+			c.JSON(http.StatusBadRequest, err.Error())
 			return
 		}
+		fmt.Printf("deployment received:\n%v\n", deployment)
+		fmt.Println("annotations tagged as 'test' is:")
+		fmt.Println(deployment.Spec.Template.Annotations["test"])
 		result, err := clientSet.AppsV1().Deployments(apiv1.NamespaceDefault).Create(deployment)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, err)
+			c.JSON(http.StatusBadRequest, err.Error())
 			return
 		}
 		c.JSON(http.StatusCreated, result)
@@ -108,7 +141,7 @@ func DyClientSet(config *rest.Config, clientSet **kubernetes.Clientset) gin.Hand
 			fmt.Println("error occurred in clientSet creating...")
 			panic(err.Error())
 		}
-		fmt.Printf("clientSet created: %v\n", *clientSet)
+		//fmt.Printf("clientSet created: %v\n", *clientSet)
 	}
 }
 
@@ -140,7 +173,7 @@ func DynamicClientSet(config *rest.Config, clientSet **kubernetes.Clientset) gin
 			fmt.Printf("error occurred in client set...")
 			panic(err.Error())
 		}
-		fmt.Printf("clientSet created: %v\n", *clientSet)
+		//fmt.Printf("clientSet created: %v\n", *clientSet)
 
 		//config.BearerTokenFile = ""
 		//config.BearerToken = token
