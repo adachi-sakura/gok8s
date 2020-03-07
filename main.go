@@ -1,6 +1,8 @@
 package main
 import (
+	"context"
 	"fmt"
+	prom_cli "github.com/buzaiguna/gok8s/prom-cli"
 	"github.com/buzaiguna/gok8s/utils"
 	"github.com/gin-gonic/gin"
 	appsv1 "k8s.io/api/apps/v1"
@@ -12,6 +14,8 @@ import (
 	"k8s.io/client-go/tools/clientcmd/api"
 	metricsclientset "k8s.io/metrics/pkg/client/clientset/versioned"
 	"net/http"
+	prom "github.com/prometheus/client_golang/api/prometheus/v1"
+	"time"
 )
 
 const (
@@ -107,6 +111,22 @@ func main() {
 		}
 		c.JSON(http.StatusOK, metrics)
 
+	})
+	router.GET("/prom/api-request-total", func(c *gin.Context) {
+		cli := prom_cli.ConnectProm()
+		t := time.Now()
+		r := prom.Range{
+			Start:	t.Add(-3*time.Hour),
+			End:	t,
+			Step:	time.Hour,
+
+		}
+		res, _, err := prom.NewAPI(cli).QueryRange(context.Background(), "apiserver_request_total", r)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, err)
+			return
+		}
+		c.JSON(200, res)
 	})
 	router.POST("/deployments", DynamicClientSet(config, &clientSet), func(c * gin.Context) {
 		deployment := &appsv1.Deployment{}
