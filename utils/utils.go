@@ -6,7 +6,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"io/ioutil"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/client-go/kubernetes/scheme"
 	"strings"
 )
 
@@ -60,4 +62,35 @@ func Bind(c *gin.Context, obj interface{}) error {
 		}
 	}
 	return nil
+}
+
+func DecodeK8SResources(c *gin.Context) ([]runtime.Object, error) {
+	yamlFiles, err := ioutil.ReadAll(c.Request.Body)
+	if err != nil {
+		//panic(err)
+		return nil, BindError{
+			reason:	fmt.Sprintf("error occurred in request body get due to:\n%s", err.Error()),
+		}
+	}
+	return parseK8SYaml(yamlFiles), nil
+}
+
+func parseK8SYaml(fileR []byte) []runtime.Object {
+	filesAsString := string(fileR[:])
+	sepYamlFiles := strings.Split(filesAsString, "---")
+	retObj := []runtime.Object{}
+	for _, file := range sepYamlFiles {
+		if file == "\n" || file == "" {
+			continue
+		}
+		decode := scheme.Codecs.UniversalDeserializer().Decode
+		obj, groupVersionKind, err := decode([]byte(file), nil, nil)
+		fmt.Println(groupVersionKind)
+		if err != nil {
+			fmt.Printf("error occurred when decoding yaml file\n %s ", err.Error())
+			continue
+		}
+		retObj = append(retObj, obj)
+	}
+	return retObj
 }

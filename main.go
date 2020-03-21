@@ -144,6 +144,32 @@ func main() {
 		}
 		c.JSON(http.StatusCreated, result)
 	})
+	router.POST("/decoding", func(c *gin.Context) {
+		services := []*apiv1.Service{}
+		deployments := []*appsv1.Deployment{}
+		objs, err := utils.DecodeK8SResources(c)
+		if err != nil {
+			fmt.Println("decoding failed")
+			panic(err)
+		}
+		for _, obj := range objs {
+			switch o := obj.(type) {
+			case *appsv1.Deployment:
+				deployments = append(deployments, o)
+			case *apiv1.Service:
+				services = append(services, o)
+			default:
+			}
+		}
+		ret := []interface{}{}
+		for _, service := range services {
+			ret = append(ret, service)
+		}
+		for _, deployment := range deployments {
+			ret = append(ret, deployment)
+		}
+		c.JSON(200, ret)
+	})
 	router.Run(":8080")
 }
 
