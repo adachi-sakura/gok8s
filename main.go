@@ -2,6 +2,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/buzaiguna/gok8s/model"
 	prom_cli "github.com/buzaiguna/gok8s/prom-cli"
 	"github.com/buzaiguna/gok8s/utils"
 	"github.com/gin-gonic/gin"
@@ -98,6 +99,31 @@ func main() {
 		c.JSON(http.StatusOK, metrics)
 
 	})
+	router.GET("/metrics/nodes/:nodeName", DyClientSet(config, &clientSet), func(c *gin.Context) {
+		metricsClientSet, err := metricsclientset.NewForConfig(config)
+		if err != nil {
+			fmt.Printf("error occurred in metrics client set creating...")
+			panic(err)
+		}
+		name := c.Param("nodeName")
+		metrics, err := metricsClientSet.MetricsV1beta1().NodeMetricses().Get(name, metav1.GetOptions{})
+		if err != nil {
+			fmt.Printf("error occurred in metrics get...")
+			c.JSON(http.StatusBadRequest, err.Error())
+		}
+		fmt.Println(metrics.Usage[apiv1.ResourceCPU])
+		c.JSON(http.StatusOK, metrics)
+
+	})
+	router.GET("/nodes/:nodeName", DyClientSet(config, &clientSet), func(c *gin.Context) {
+
+		name := c.Param("nodeName")
+		node, _ := clientSet.CoreV1().Nodes().Get(name, metav1.GetOptions{})
+		fmt.Println(node.Status.Capacity[apiv1.ResourceCPU])
+		fmt.Println(node.Status.Allocatable[apiv1.ResourceMemory])
+		c.JSON(http.StatusOK, node)
+
+	})
 	router.GET("/metrics/pods", DyClientSet(config, &clientSet), func(c *gin.Context) {
 		metricsClientSet, err := metricsclientset.NewForConfig(config)
 		if err != nil {
@@ -168,6 +194,81 @@ func main() {
 		for _, deployment := range deployments {
 			ret = append(ret, deployment)
 		}
+		c.JSON(200, ret)
+	})
+	router.GET("/all-metrics", DyClientSet(config, &clientSet), func(c *gin.Context) {
+		ret := model.AlgorithmParameters{}
+		deployments := []*appsv1.Deployment{}
+		objs, err := utils.DecodeK8SResources(c)
+		if err != nil {
+			fmt.Println("decoding failed")
+			panic(err)
+		}
+		for _, obj := range objs {
+			switch o := obj.(type) {
+			case *appsv1.Deployment:
+				deployments = append(deployments, o)
+			default:
+			}
+		}
+		metricsClientSet, err := metricsclientset.NewForConfig(config)
+		if err != nil {
+			fmt.Printf("error occurred in metrics client set creating...")
+			panic(err)
+		}
+		metricsList, err := metricsClientSet.MetricsV1beta1().NodeMetricses().List(metav1.ListOptions{})
+		if err != nil {
+			fmt.Printf("error occurred in metrics list...")
+			c.JSON(http.StatusBadRequest, err.Error())
+		}
+		nodeMetrics := metricsList.Items
+		nodesStatus := []apiv1.Node{}
+		nodesList, err := clientSet.CoreV1().Nodes().List(metav1.ListOptions{})
+		if err != nil {
+			panic(err)
+		}
+		nodesStatus = append(nodesStatus, nodesList.Items...)
+		nodes := map[string]*model.Node{}
+		for _, nodeStatus := range nodesStatus {
+			if _, exist := nodeStatus.Labels["node-role.kubernetes.io/master"]; exist {
+				continue
+			}
+			nodes[nodeStatus.Name] = &model.Node{
+				Sum_cpu:	nodeStatus.Status.Capacity.Cpu().MilliValue(),
+				Allocatable_cpu:	nodeStatus.Status.Allocatable.Cpu().MilliValue(),
+				Sum_mem:	nodeStatus.Status.Capacity.Memory().Value()/1024/1024,
+				Allocatable_mem:	nodeStatus.Status.Allocatable.Memory().Value()/1024/1024,
+			}
+		}
+		for _, metric := range nodeMetrics {
+			if _, exist := nodes[metric.Name]; !exist {
+				continue
+			}
+			//fmt.Println("by CPU(): ",metric.Usage.Cpu())
+			//fmt.Println("mili: ", metric.Usage.Cpu().MilliValue())
+			//fmt.Println("by map: ", metric.Usage[apiv1.ResourceCPU])
+			nodes[metric.Name].Current_cpu = metric.Usage.Cpu().MilliValue()
+			nodes[metric.Name].Current_mem = metric.Usage.Memory().Value()/1024/1024
+		}
+		for _, node := range nodes {
+			ret.Nodes = append(ret.Nodes, node)
+		}
+		cli := prom_cli.ConnectProm()
+		t := time.Now()
+		duration := "10m"
+		//datas := []*model.MicroservcieData{}
+		for _, deployment := range deployments {
+			deployName := deployment.Name
+			//containerName := deployment.Spec.Template.Spec.Containers[0].Name
+			query := fmt.Sprintf("container_network_receive_bytes_total{ pod =~ \"%s.*\"}[%s]", deployName, duration)
+			res, _, err := prom.NewAPI(cli).Query(context.Background(), query, t)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, err)
+				return
+			}
+			fmt.Printf("%v\n",res)
+		}
+
 		c.JSON(200, ret)
 	})
 	router.Run(":8080")
