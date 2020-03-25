@@ -6,7 +6,6 @@ import (
 	myProm "github.com/buzaiguna/gok8s/prom"
 	"github.com/buzaiguna/gok8s/utils"
 	"github.com/gin-gonic/gin"
-	model2 "github.com/prometheus/common/model"
 	appsv1 "k8s.io/api/apps/v1"
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -15,6 +14,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
 	metricsclientset "k8s.io/metrics/pkg/client/clientset/versioned"
+	"math"
 	"net/http"
 	prom "github.com/prometheus/client_golang/api/prometheus/v1"
 	"strconv"
@@ -256,7 +256,6 @@ func main() {
 		for _, node := range nodes {
 			ret.Nodes = append(ret.Nodes, node)
 		}
-		cli := myProm.ConnectProm()
 		t := time.Now()
 		duration := "10m"
 		datas := []*model.MicroservcieData{}
@@ -282,28 +281,66 @@ func main() {
 				dependencyMap[deployName] = append(dependencyMap[deployName], dependencyArr...)
 			}
 
-			//containerName := deployment.Spec.Template.Spec.Containers[0].Name
+			containerName := deployment.Spec.Template.Spec.Containers[0].Name
+
 			query := fmt.Sprintf("container_network_receive_bytes_total{ pod =~ \"%s.*\"}[%s]", deployName, duration)
-			res, _, err := prom.NewAPI(cli).Query(context.Background(), query, t)
+			res, err := myProm.Query(query, t)
 			if err != nil {
 				c.JSON(http.StatusBadRequest, err)
 				return
 			}
+			matValues := myProm.GetMatrixValues(res)
+			data.Receive = matValues.Increment()
+
+			query = fmt.Sprintf("container_network_transmit_bytes_total{ pod =~ \"%s.*\"}[%s]", deployName, duration)
+			res, err = myProm.Query(query, t)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, err)
+				return
+			}
+			matValues = myProm.GetMatrixValues(res)
+			data.Transmit = matValues.Increment()
+
+			query = fmt.Sprintf("container_cpu_usage_seconds_total{ container = \"%s\", pod =~ \"%s.*\"}[%s]",
+								containerName, deployName, duration)
+			res, err = myProm.Query(query, t)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, err)
+				return
+			}
+			matValues = myProm.GetMatrixValues(res)
+			data.CpuUsageTime = matValues.Increment()
+			data.CpuTimeTotal = matValues.ElapsedTime()
+
+			query = fmt.Sprintf("container_memory_max_usage_bytes{ container = \"%s\", pod =~ \"%s.*\"}", containerName, deployName)
+			res, err = myProm.Query(query, t)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, err)
+				return
+			}
+			vecValues := myProm.GetVectorValues(res)
+			max := myProm.Max(vecValues...)
+			data.MaxMemoryUsage = float64(max)
+
 			//fmt.Println("response type is: "+res.Type().String())
 			//fmt.Println("response string is:"+res.String())
-			mat, ok := res.(model2.Matrix)
-			if !ok {
-				panic("prom data convert failed...")
-			}
-			sampleStream := myProm.GetLatestSampleStream(mat)
-			values := sampleStream.Values
-			data.Receive = float64(values[len(values)-1].Value - values[0].Value)
-
 			datas = append(datas, data)
 		}
+
 		ret.Datas = datas
 
 		c.JSON(200, ret)
+	})
+	router.GET("/max-memory", func(c *gin.Context) {
+		containerName := c.Query("container")
+		query := fmt.Sprintf("container_memory_max_usage_bytes{ container = \"%s\"}", containerName)
+		res, err := myProm.Query(query, time.Now())
+		if err != nil {
+			panic(err.Error())
+		}
+		fmt.Println("response type is: "+res.Type().String())
+		fmt.Println("response string is:"+res.String())
+		c.JSON(200, res)
 	})
 	router.Run(":8080")
 }

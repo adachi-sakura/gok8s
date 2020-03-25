@@ -2,8 +2,12 @@ package prom
 
 import (
 	"fmt"
+	"context"
 	"github.com/prometheus/client_golang/api"
+	"github.com/prometheus/common/model"
+	prom "github.com/prometheus/client_golang/api/prometheus/v1"
 	"os"
+	"time"
 )
 
 var promCli api.Client
@@ -36,4 +40,10 @@ func getPromCliWithENV(host string, port string) (api.Client, error) {
 	}
 	c, err := api.NewClient(cfg)
 	return c, err
+}
+
+func Query(query string, t time.Time) (model.Value, error) {
+	cli := ConnectProm()
+	res, _, err := prom.NewAPI(cli).Query(context.Background(), query, t)
+	return res, err
 }
