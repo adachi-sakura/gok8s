@@ -21,8 +21,8 @@ type (
 	}
 
 	Network struct {
-		receive		float64 `json:"receive"`
-		transmit	float64 `json:"transmit"`
+		Receive		float64 `json:"receive"`
+		Transmit	float64 `json:"transmit"`
 	}
 
 	MicroserviceMetrics struct {
@@ -34,7 +34,7 @@ type (
 	}
 
 	MicroserviceYaml struct {
-		Replicas			int	`json:"replicas"`
+		Replicas			int32	`json:"replicas"`
 		LeastResponseTime	float64	`json:"leastResponseTime"`
 		MicroservicesToInvoke []int	`json:"microservicesToInvoke"`
 	}

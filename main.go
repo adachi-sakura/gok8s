@@ -3,9 +3,10 @@ import (
 	"context"
 	"fmt"
 	"github.com/buzaiguna/gok8s/model"
-	prom_cli "github.com/buzaiguna/gok8s/prom-cli"
+	myProm "github.com/buzaiguna/gok8s/prom"
 	"github.com/buzaiguna/gok8s/utils"
 	"github.com/gin-gonic/gin"
+	model2 "github.com/prometheus/common/model"
 	appsv1 "k8s.io/api/apps/v1"
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -16,6 +17,8 @@ import (
 	metricsclientset "k8s.io/metrics/pkg/client/clientset/versioned"
 	"net/http"
 	prom "github.com/prometheus/client_golang/api/prometheus/v1"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -139,7 +142,7 @@ func main() {
 
 	})
 	router.GET("/prom/api-request-total", func(c *gin.Context) {
-		cli := prom_cli.ConnectProm()
+		cli := myProm.ConnectProm()
 		t := time.Now()
 		r := prom.Range{
 			Start:	t.Add(-3*time.Hour),
@@ -253,12 +256,32 @@ func main() {
 		for _, node := range nodes {
 			ret.Nodes = append(ret.Nodes, node)
 		}
-		cli := prom_cli.ConnectProm()
+		cli := myProm.ConnectProm()
 		t := time.Now()
 		duration := "10m"
-		//datas := []*model.MicroservcieData{}
-		for _, deployment := range deployments {
+		datas := []*model.MicroservcieData{}
+		dict := map[string]int{}
+		dependencyMap := map[string][]string{}
+		for num, deployment := range deployments {
+			data := &model.MicroservcieData{}
+			data.Replicas = *deployment.Spec.Replicas
+
+			leastResponseTime := deployment.Labels["leastResponseTime"]
+			if leastResponseTime != "" {
+				data.LeastResponseTime, err = strconv.ParseFloat(leastResponseTime, 64)
+				if err != nil {
+					panic(err.Error())
+				}
+			}
+
 			deployName := deployment.Name
+			dict[deployName] = num
+			dependencies := deployment.Labels["dependencies"]
+			if dependencies != "" {
+				dependencyArr := strings.Split(dependencies, ",")
+				dependencyMap[deployName] = append(dependencyMap[deployName], dependencyArr...)
+			}
+
 			//containerName := deployment.Spec.Template.Spec.Containers[0].Name
 			query := fmt.Sprintf("container_network_receive_bytes_total{ pod =~ \"%s.*\"}[%s]", deployName, duration)
 			res, _, err := prom.NewAPI(cli).Query(context.Background(), query, t)
@@ -266,8 +289,19 @@ func main() {
 				c.JSON(http.StatusBadRequest, err)
 				return
 			}
-			fmt.Printf("%v\n",res)
+			//fmt.Println("response type is: "+res.Type().String())
+			//fmt.Println("response string is:"+res.String())
+			mat, ok := res.(model2.Matrix)
+			if !ok {
+				panic("prom data convert failed...")
+			}
+			sampleStream := myProm.GetLatestSampleStream(mat)
+			values := sampleStream.Values
+			data.Receive = float64(values[len(values)-1].Value - values[0].Value)
+
+			datas = append(datas, data)
 		}
+		ret.Datas = datas
 
 		c.JSON(200, ret)
 	})
