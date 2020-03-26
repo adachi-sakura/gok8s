@@ -9,10 +9,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/kubernetes/scheme"
+	"strconv"
 	"strings"
 )
 
-
+const (
+	INT_MAX = int(^uint(0) >> 1)
+	INT_MIN = int(^INT_MAX)
+)
 
 type BindError struct {
 	reason string
@@ -101,4 +105,8 @@ func TrimSpace(strs []string) []string {
 		ret = append(ret, strings.TrimSpace(str))
 	}
 	return ret
+}
+
+func Float64(s string) (float64, error) {
+	return strconv.ParseFloat(s, 64)
 }

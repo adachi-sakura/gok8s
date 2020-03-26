@@ -199,7 +199,16 @@ func main() {
 		c.JSON(200, ret)
 	})
 	router.GET("/all-metrics", DyClientSet(config, &clientSet), func(c *gin.Context) {
-		ret := model.AlgorithmParameters{}
+		ret := model.AlgorithmParameters{
+			TotalTimeRequired:	float64(utils.INT_MAX),
+		}
+		totalTimeRequired := c.Query("totalTime")
+		if totalTimeRequired != "" {
+			ret.TotalTimeRequired, err = utils.Float64(totalTimeRequired)
+			if err != nil {
+				panic(err.Error())
+			}
+		}
 		deployments := []*appsv1.Deployment{}
 		objs, err := utils.DecodeK8SResources(c)
 		if err != nil {
@@ -258,15 +267,24 @@ func main() {
 		t := time.Now()
 		duration := "10m"
 		datas := []*model.MicroservcieData{}
+		entrance := c.Query("entry")
+		if entrance == "" {
+			c.JSON(http.StatusBadRequest, "entrance point required")
+		}
 		dict := map[string]int{}
 		dependencyMap := map[string][]string{}
 		for num, deployment := range deployments {
-			data := &model.MicroservcieData{}
+			data := &model.MicroservcieData{
+				MicroserviceMetrics: model.MicroserviceMetrics{},
+				MicroserviceYaml: model.MicroserviceYaml{
+					LeastResponseTime:	float64(utils.INT_MAX),
+				},
+			}
 			data.Replicas = *deployment.Spec.Replicas
 
 			leastResponseTime := deployment.Labels["leastResponseTime"]
 			if leastResponseTime != "" {
-				data.LeastResponseTime, err = strconv.ParseFloat(leastResponseTime, 64)
+				data.LeastResponseTime, err = utils.Float64(leastResponseTime)
 				if err != nil {
 					panic(err.Error())
 				}
@@ -326,6 +344,13 @@ func main() {
 			//fmt.Println("response string is:"+res.String())
 			datas = append(datas, data)
 		}
+
+		num, exists := dict[entrance]
+		if !exists {
+			c.JSON(http.StatusBadRequest, "entrance service name not found")
+		}
+		ret.EntrancePoint = num
+
 		for serviceName, dependencies := range dependencyMap {
 			num := dict[serviceName]
 			for _, nextServiceName := range dependencies {
