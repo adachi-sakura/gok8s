@@ -14,7 +14,6 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
 	metricsclientset "k8s.io/metrics/pkg/client/clientset/versioned"
-	"math"
 	"net/http"
 	prom "github.com/prometheus/client_golang/api/prometheus/v1"
 	"strconv"
@@ -278,6 +277,7 @@ func main() {
 			dependencies := deployment.Labels["dependencies"]
 			if dependencies != "" {
 				dependencyArr := strings.Split(dependencies, ",")
+				dependencyArr = utils.TrimSpace(dependencyArr)
 				dependencyMap[deployName] = append(dependencyMap[deployName], dependencyArr...)
 			}
 
@@ -290,7 +290,7 @@ func main() {
 				return
 			}
 			matValues := myProm.GetMatrixValues(res)
-			data.Receive = matValues.Increment()
+			data.Receive = myProm.SumIncrement(matValues...)/1024
 
 			query = fmt.Sprintf("container_network_transmit_bytes_total{ pod =~ \"%s.*\"}[%s]", deployName, duration)
 			res, err = myProm.Query(query, t)
@@ -299,7 +299,7 @@ func main() {
 				return
 			}
 			matValues = myProm.GetMatrixValues(res)
-			data.Transmit = matValues.Increment()
+			data.Transmit = myProm.SumIncrement(matValues...)/1024
 
 			query = fmt.Sprintf("container_cpu_usage_seconds_total{ container = \"%s\", pod =~ \"%s.*\"}[%s]",
 								containerName, deployName, duration)
@@ -309,8 +309,8 @@ func main() {
 				return
 			}
 			matValues = myProm.GetMatrixValues(res)
-			data.CpuUsageTime = matValues.Increment()
-			data.CpuTimeTotal = matValues.ElapsedTime()
+			data.CpuUsageTime = myProm.SumIncrement(matValues...)
+			data.CpuTimeTotal = myProm.SumElapsedTime(matValues...)
 
 			query = fmt.Sprintf("container_memory_max_usage_bytes{ container = \"%s\", pod =~ \"%s.*\"}", containerName, deployName)
 			res, err = myProm.Query(query, t)
@@ -320,11 +320,22 @@ func main() {
 			}
 			vecValues := myProm.GetVectorValues(res)
 			max := myProm.Max(vecValues...)
-			data.MaxMemoryUsage = float64(max)
+			data.MaxMemoryUsage = float64(max)/1024/1024
 
 			//fmt.Println("response type is: "+res.Type().String())
 			//fmt.Println("response string is:"+res.String())
 			datas = append(datas, data)
+		}
+		for serviceName, dependencies := range dependencyMap {
+			num := dict[serviceName]
+			for _, nextServiceName := range dependencies {
+				dependencyNum, exists := dict[nextServiceName]
+				if !exists {
+					c.JSON(http.StatusBadRequest, "invalid dependency name")
+					return
+				}
+				datas[num].MicroservicesToInvoke = append(datas[num].MicroservicesToInvoke, dependencyNum)
+			}
 		}
 
 		ret.Datas = datas

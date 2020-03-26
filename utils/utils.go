@@ -94,3 +94,11 @@ func parseK8SYaml(fileR []byte) []runtime.Object {
 	}
 	return retObj
 }
+
+func TrimSpace(strs []string) []string {
+	ret := []string{}
+	for _, str := range strs {
+		ret = append(ret, strings.TrimSpace(str))
+	}
+	return ret
+}

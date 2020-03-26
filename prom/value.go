@@ -24,16 +24,18 @@ func getLatestSampleStream(m model.Matrix) *model.SampleStream{
 	return m[pos]
 }
 
-type PromMetricValues []model.SamplePair
+type PromRangeValue []model.SamplePair
 
-//todo modify
-func GetMatrixValues(val model.Value) PromMetricValues {
+func GetMatrixValues(val model.Value) []PromRangeValue {
 	if val.Type() != model.ValMatrix {
 		panic("not matrix value...")
 	}
 	mat := val.(model.Matrix)
-	sampleStream := getLatestSampleStream(mat)
-	return sampleStream.Values
+	rangeValues := []PromRangeValue{}
+	for _, sampleStream := range mat {
+		rangeValues = append(rangeValues, sampleStream.Values)
+	}
+	return rangeValues
 }
 
 func GetVectorValues(val model.Value) []model.SampleValue {
@@ -56,11 +58,27 @@ func Max(values ...model.SampleValue) model.SampleValue {
 	return model.SampleValue(ret)
 }
 
-func (values PromMetricValues) Increment() float64 {
+func (values PromRangeValue) Increment() float64 {
 	return float64(values[len(values)-1].Value - values[0].Value)
 }
 
-func (values PromMetricValues) ElapsedTime() float64 {
+func SumIncrement(values ...PromRangeValue) float64 {
+	sum := 0.
+	for _, value := range values{
+		sum += value.Increment()
+	}
+	return sum
+}
+
+func (values PromRangeValue) ElapsedTime() float64 {
 	duration := values[len(values)-1].Timestamp.Sub(values[0].Timestamp)
 	return duration.Seconds()
+}
+
+func SumElapsedTime(values ...PromRangeValue) float64 {
+	sum := 0.
+	for _, value := range values {
+		sum += value.ElapsedTime()
+	}
+	return sum
 }
