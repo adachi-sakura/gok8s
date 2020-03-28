@@ -16,7 +16,6 @@ import (
 	metricsclientset "k8s.io/metrics/pkg/client/clientset/versioned"
 	"net/http"
 	prom "github.com/prometheus/client_golang/api/prometheus/v1"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -270,6 +269,7 @@ func main() {
 		entrance := c.Query("entry")
 		if entrance == "" {
 			c.JSON(http.StatusBadRequest, "entrance point required")
+			return
 		}
 		dict := map[string]int{}
 		dependencyMap := map[string][]string{}
@@ -278,6 +278,7 @@ func main() {
 				MicroserviceMetrics: model.MicroserviceMetrics{},
 				MicroserviceYaml: model.MicroserviceYaml{
 					LeastResponseTime:	float64(utils.INT_MAX),
+					MicroservicesToInvoke: []int{},
 				},
 			}
 			data.Replicas = *deployment.Spec.Replicas
@@ -319,7 +320,7 @@ func main() {
 			matValues = myProm.GetMatrixValues(res)
 			data.Transmit = myProm.SumIncrement(matValues...)/1024
 
-			query = fmt.Sprintf("container_cpu_usage_seconds_total{ container = \"%s\", pod =~ \"%s.*\"}[%s]",
+			query = fmt.Sprintf("container_cpu_usage_seconds_total{ container =~ \"%s.*\", pod =~ \"%s.*\"}[%s]",
 								containerName, deployName, duration)
 			res, err = myProm.Query(query, t)
 			if err != nil {
@@ -330,7 +331,16 @@ func main() {
 			data.CpuUsageTime = myProm.SumIncrement(matValues...)
 			data.CpuTimeTotal = myProm.SumElapsedTime(matValues...)
 
-			query = fmt.Sprintf("container_memory_max_usage_bytes{ container = \"%s\", pod =~ \"%s.*\"}", containerName, deployName)
+			query = fmt.Sprintf("http_requests_total{ pod =~ \"%s.*\"}[%s]", deployName, duration)
+			res, err = myProm.Query(query, t)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, err)
+				return
+			}
+			matValues = myProm.GetMatrixValues(res)
+			data.HttpRequestsCount = int(myProm.SumIncrement(matValues...))
+
+			query = fmt.Sprintf("container_memory_max_usage_bytes{ container =~ \"%s.*\", pod =~ \"%s.*\"}", containerName, deployName)
 			res, err = myProm.Query(query, t)
 			if err != nil {
 				c.JSON(http.StatusBadRequest, err)
@@ -348,6 +358,7 @@ func main() {
 		num, exists := dict[entrance]
 		if !exists {
 			c.JSON(http.StatusBadRequest, "entrance service name not found")
+			return
 		}
 		ret.EntrancePoint = num
 

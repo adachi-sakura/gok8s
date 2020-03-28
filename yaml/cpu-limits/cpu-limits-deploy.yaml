@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cpu-limits
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cpu-limits
+  template:
+    metadata:
+      labels:
+        app: cpu-limits
+    spec:
+      containers:
+      - name: cpu-limits
+        image: 192.168.2.105:5000/centos
+        pullPolicy: IfNotPresent
+        resources:
+          requests:
+            cpu: 100m
+            memory: 50Mi
+          limits:
+            cpu: 100m
+        command: ["/bin/sh"]
+        args: ["-c", "while true; do timeout 0.5s yes >/dev/null; sleep 0.5s; done"]
