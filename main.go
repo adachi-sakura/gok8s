@@ -6,6 +6,7 @@ import (
 	myProm "github.com/buzaiguna/gok8s/prom"
 	"github.com/buzaiguna/gok8s/utils"
 	"github.com/gin-gonic/gin"
+	"gopkg.in/mgo.v2/bson"
 	appsv1 "k8s.io/api/apps/v1"
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,6 +33,12 @@ func main() {
 	fmt.Printf("initial config token: %s\ntokenfile: %s", config.BearerToken, config.BearerTokenFile)
 	clientSet := &kubernetes.Clientset{}
 
+	//todo unit test
+	type mapItem struct {
+		deployments map[string]*appsv1.Deployment
+		nodes	map[string]*model.Node
+	}
+	deploymentsMap := map[string]mapItem{}
 
 	router := gin.Default()
 	router.GET("/ping", func(c *gin.Context) {
@@ -198,6 +205,10 @@ func main() {
 		c.JSON(200, ret)
 	})
 	router.GET("/all-metrics", DyClientSet(config, &clientSet), func(c *gin.Context) {
+		item := mapItem{
+			deployments: map[string]*appsv1.Deployment{},
+			nodes: map[string]*model.Node{},
+		}
 		ret := model.AlgorithmParameters{
 			TotalTimeRequired:	float64(utils.INT_MAX),
 		}
@@ -244,6 +255,7 @@ func main() {
 				continue
 			}
 			nodes[nodeStatus.Name] = &model.Node{
+				Name:		nodeStatus.Name,
 				Sum_cpu:	nodeStatus.Status.Capacity.Cpu().MilliValue(),
 				Allocatable_cpu:	nodeStatus.Status.Allocatable.Cpu().MilliValue(),
 				Sum_mem:	nodeStatus.Status.Capacity.Memory().Value()/1024/1024,
@@ -263,6 +275,8 @@ func main() {
 		for _, node := range nodes {
 			ret.Nodes = append(ret.Nodes, node)
 		}
+		//todo storage
+		item.nodes = nodes
 		t := time.Now()
 		duration := "10m"
 		datas := []*model.MicroservcieData{}
@@ -292,6 +306,9 @@ func main() {
 			}
 
 			deployName := deployment.Name
+			//todo storage
+			item.deployments[deployName] = deployment
+			data.Name = deployName
 			dict[deployName] = num
 			dependencies := deployment.Labels["dependencies"]
 			if dependencies != "" {
@@ -376,6 +393,11 @@ func main() {
 
 		ret.Datas = datas
 
+		//todo storage
+		id := bson.NewObjectId().Hex()
+		deploymentsMap[id] = item
+
+		fmt.Println(id)
 		c.JSON(200, ret)
 	})
 	router.GET("/max-memory", func(c *gin.Context) {

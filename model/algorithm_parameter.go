@@ -12,6 +12,7 @@ type (
 	}
 
 	Node struct {
+		Name		string `json:"name"`
 		Current_cpu	int64	`json:"current_cpu"`
 		Allocatable_cpu int64 `json:"allocatable_cpu"`
 		Sum_cpu		int64 `json:"sum_cpu"`
@@ -42,6 +43,7 @@ type (
 	MicroservcieData struct {
 		MicroserviceMetrics
 		MicroserviceYaml
+		Name	string `json:"name"`
 	}
 
 	AlgorithmParameters struct {
@@ -53,4 +55,17 @@ type (
 		Bandwidth			int		`json:"bandwidth"`
 		TotalTimeRequired	float64	`json:"totalTimeRequired"`
 	}
+
+	containerAllocation struct {
+		Loc		string `json:"loc"`
+		Cpu		float64 `json:"cpu"`
+	}
+
+	MicroserviceAllocation struct {
+		Name		string `json:"name"`
+		Containers	[]containerAllocation `json:"containers"`
+		RequestMemory float64 `json:"requestMemory"`
+	}
+
+
 )
