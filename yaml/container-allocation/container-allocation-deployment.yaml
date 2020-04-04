@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: container-allocation
+  labels:
+    app: container-allocation
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: container-allocation
+  template:
+    metadata:
+      labels:
+        app: container-allocation
+    spec:
+      containers:
+      - image: 192.168.2.112:5000/container-allocation:v0.2
+        imagePullPolicy: IfNotPresent
+        name: container-allocation
+        ports:
+        - name: http
+          containerPort: 8080

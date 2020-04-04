@@ -1,12 +1,12 @@
 package prom
 
 import (
-	"fmt"
 	"context"
+	"fmt"
+	"github.com/buzaiguna/gok8s/config"
 	"github.com/prometheus/client_golang/api"
-	"github.com/prometheus/common/model"
 	prom "github.com/prometheus/client_golang/api/prometheus/v1"
-	"os"
+	"github.com/prometheus/common/model"
 	"time"
 )
 
@@ -17,7 +17,7 @@ func ConnectProm() api.Client {
 		return promCli
 	}
 	//todo ns & name parameter
-	host, port := os.Getenv("PROMETHEUS_SERVICE_HOST"), os.Getenv("PROMETHEUS_SERVICE_PORT")
+	host, port := config.PROMETHEUS_HOST, config.PROMETHEUS_PORT
 	cli, err := getPromCliWithENV(host, port)
 	if err != nil {
 		panic(err)
