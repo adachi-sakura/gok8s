@@ -1,14 +1,17 @@
 package utils
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
+	"io"
 	"io/ioutil"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/kubernetes/scheme"
+	"os"
 	"strconv"
 	"strings"
 )
@@ -118,10 +121,30 @@ func NewInt32(n int) *int32 {
 
 type Int64 int64
 
-func (num Int64) KB() int64 {
+func (num Int64) KBtoB() int64 {
 	return int64(num*1024)
 }
 
-func (num Int64) MB() int64 {
+func (num Int64) MBtoKB() int64 {
+	return int64(num*1024)
+}
+
+func (num Int64) MBtoB() int64 {
 	return int64(num*1024*1024)
+}
+
+func GetSelectedLineInFile(path string, num int) (string, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+	reader := bufio.NewReader(file)
+	for line := 0; line < num-1; line++ {
+		_, err := reader.ReadString('\n')
+		if err != nil && err != io.EOF {
+			return "", err
+		}
+	}
+	return reader.ReadString('\n')
 }

@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gok8s
+  labels:
+    app: gok8s
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gok8s
+  template:
+    metadata:
+      labels:
+        app: gok8s
+    spec:
+      containers:
+        - image: adachisakura/gok8s:v0.7.4
+          imagePullPolicy: IfNotPresent
+          name: gok8s
+          env:
+            - name:  PROMETHEUS_SERVICE_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: gok8s-cfg
+                  key: PROMETHEUS_SERVICE_HOST
+            - name: PROMETHEUS_SERVICE_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: gok8s-cfg
+                  key: PROMETHEUS_SERVICE_PORT
+          volumeMounts:
+            - name: gok8s-cfg
+              mountPath: /config
+          ports:
+            - name: http
+              containerPort: 8080
+      volumes:
+        - name: gok8s-cfg
+          configMap:
+            name: gok8s-cfg
+            items:
+              - key: result.csv
+                path: result.csv

@@ -440,7 +440,7 @@ func main() {
 				newDeployment.Spec.Template.Labels["container-allocation-deployment"] = newDeployment.Name
 				requests := apiv1.ResourceList{}
 				requests[apiv1.ResourceCPU] = *resource.NewMilliQuantity(int64(math.Ceil(container.Cpu)), resource.DecimalSI)
-				requests[apiv1.ResourceMemory] = *resource.NewQuantity(utils.Int64(microservice.RequestMemory).MB(), resource.BinarySI)
+				requests[apiv1.ResourceMemory] = *resource.NewQuantity(utils.Int64(microservice.RequestMemory).MBtoB(), resource.BinarySI)
 				newDeployment.Spec.Template.Spec.Containers[0].Resources.Requests = requests
 				newDeployment.Spec.Template.Spec.Containers[0].Resources.Limits = nil
 				ret = append(ret, &newDeployment)
