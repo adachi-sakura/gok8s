@@ -2,12 +2,14 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	cfg "github.com/buzaiguna/gok8s/config"
 	"github.com/buzaiguna/gok8s/model"
 	myProm "github.com/buzaiguna/gok8s/prom"
 	"github.com/buzaiguna/gok8s/utils"
 	"github.com/gin-gonic/gin"
+	prom "github.com/prometheus/client_golang/api/prometheus/v1"
 	"gopkg.in/mgo.v2/bson"
 	"io/ioutil"
 	appsv1 "k8s.io/api/apps/v1"
@@ -21,10 +23,8 @@ import (
 	metricsclientset "k8s.io/metrics/pkg/client/clientset/versioned"
 	"math"
 	"net/http"
-	prom "github.com/prometheus/client_golang/api/prometheus/v1"
 	"strings"
 	"time"
-	"encoding/json"
 )
 
 const (
@@ -468,25 +468,17 @@ func main() {
 			fmt.Println("create request failed")
 			panic(err)
 		}
-		fmt.Println("after generate request")
 		request.Header.Set("Content-Type", "application/json")
 		client := &http.Client{}
-		fmt.Println("before do request")
 		resp, err := client.Do(request)
-		fmt.Println("after request")
 		if err != nil {
 			fmt.Println("request failed")
 			panic(err)
 		}
-		fmt.Println(resp.Status)
 		if resp.StatusCode/100 > 2 {
 			panic("bad status")
 		}
 		defer resp.Body.Close()
-		choice := c.Query("choice")
-		if choice != "" {
-			c.JSON(200, resp.Header)
-		}
 		body, _ := ioutil.ReadAll(resp.Body)
 
 		item, exist := deploymentsMap[id]
@@ -494,14 +486,12 @@ func main() {
 			c.JSON(http.StatusNotFound, "id not found")
 			return
 		}
-		fmt.Println("after find")
 
 		allocations := []model.MicroserviceAllocation{}
 		if err := json.Unmarshal(body, &allocations); err != nil {
 			fmt.Println("unmarshal failed")
 			panic(err)
 		}
-		fmt.Println("after unmarshal")
 		fmt.Println(allocations)
 		newDeployments := []*appsv1.Deployment{}
 		for _, microservice := range allocations {
