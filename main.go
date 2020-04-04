@@ -1,5 +1,6 @@
 package main
 import (
+	"bytes"
 	"context"
 	"fmt"
 	cfg "github.com/buzaiguna/gok8s/config"
@@ -8,6 +9,7 @@ import (
 	"github.com/buzaiguna/gok8s/utils"
 	"github.com/gin-gonic/gin"
 	"gopkg.in/mgo.v2/bson"
+	"io/ioutil"
 	appsv1 "k8s.io/api/apps/v1"
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -22,6 +24,7 @@ import (
 	prom "github.com/prometheus/client_golang/api/prometheus/v1"
 	"strings"
 	"time"
+	"encoding/json"
 )
 
 const (
@@ -451,7 +454,91 @@ func main() {
 		fmt.Println(deploymentsMap)
 
 		fmt.Println(id)
-		c.JSON(200, ret)
+
+		fmt.Println("Ready to call algorithm")
+
+		jsonBytes, err := json.Marshal(ret)
+		if err != nil {
+			fmt.Println("marshal failed")
+			panic(err)
+		}
+		url := fmt.Sprintf("http://%s:%s/algorithm", cfg.ALGORITHM_HOST, cfg.ALGORITHM_PORT)
+		request, err := http.NewRequest(http.MethodGet, url, bytes.NewBuffer(jsonBytes))
+		if err != nil {
+			fmt.Println("create request failed")
+			panic(err)
+		}
+		fmt.Println("after generate request")
+		request.Header.Set("Content-Type", "application/json")
+		client := &http.Client{}
+		fmt.Println("before do request")
+		resp, err := client.Do(request)
+		fmt.Println("after request")
+		if err != nil {
+			fmt.Println("request failed")
+			panic(err)
+		}
+		fmt.Println(resp.Status)
+		if resp.StatusCode/100 > 2 {
+			panic("bad status")
+		}
+		defer resp.Body.Close()
+		choice := c.Query("choice")
+		if choice != "" {
+			c.JSON(200, resp.Header)
+		}
+		body, _ := ioutil.ReadAll(resp.Body)
+
+		item, exist := deploymentsMap[id]
+		if !exist {
+			c.JSON(http.StatusNotFound, "id not found")
+			return
+		}
+		fmt.Println("after find")
+
+		allocations := []model.MicroserviceAllocation{}
+		if err := json.Unmarshal(body, &allocations); err != nil {
+			fmt.Println("unmarshal failed")
+			panic(err)
+		}
+		fmt.Println("after unmarshal")
+		fmt.Println(allocations)
+		newDeployments := []*appsv1.Deployment{}
+		for _, microservice := range allocations {
+			deployment := *item.deployments[microservice.Name]
+			for num, container := range microservice.Containers {
+				newDeployment := deployment
+				newDeployment.Name = fmt.Sprintf("%s-%d", deployment.Name, num)
+				newDeployment.Spec.Replicas = utils.NewInt32(1)
+				newDeployment.Spec.Template.Spec.NodeSelector = map[string]string{}
+				newDeployment.Spec.Template.Spec.NodeSelector["kubernetes.io/hostname"] = container.Loc
+				newDeployment.Spec.Selector.MatchLabels["container-allocation-deployment"] = newDeployment.Name
+				newDeployment.Spec.Template.Labels["container-allocation-deployment"] = newDeployment.Name
+				requests := apiv1.ResourceList{}
+				requests[apiv1.ResourceCPU] = *resource.NewMilliQuantity(int64(math.Ceil(container.Cpu)), resource.DecimalSI)
+				requests[apiv1.ResourceMemory] = *resource.NewQuantity(utils.Int64(microservice.RequestMemory).MBtoB(), resource.BinarySI)
+				newDeployment.Spec.Template.Spec.Containers[0].Resources.Requests = requests
+				newDeployment.Spec.Template.Spec.Containers[0].Resources.Limits = nil
+				newDeployments = append(newDeployments, &newDeployment)
+			}
+
+		}
+		for _, deployment := range newDeployments {
+			namespace := apiv1.NamespaceDefault
+			if deployment.Namespace != "" {
+				namespace = deployment.Namespace
+			}
+			res, err := clientSet.AppsV1().Deployments(namespace).Create(deployment)
+			if err != nil {
+				fmt.Println(deployment)
+				c.JSON(http.StatusBadRequest, err.Error())
+				return
+			}
+			fmt.Println(res)
+		}
+
+
+		c.JSON(200, allocations)
 	})
 	router.GET("/max-memory", func(c *gin.Context) {
 		containerName := c.Query("container")
