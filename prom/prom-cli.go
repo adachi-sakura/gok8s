@@ -16,8 +16,8 @@ func ConnectProm() api.Client {
 	if promCli != nil {
 		return promCli
 	}
-	//todo ns & name parameter
 	host, port := config.PROMETHEUS_HOST, config.PROMETHEUS_PORT
+	//host, port := os.Getenv("PROMETHEUS_SERVICE_HOST"), os.Getenv("PROMETHEUS_SERVICE_PORT")
 	cli, err := getPromCliWithENV(host, port)
 	if err != nil {
 		panic(err)

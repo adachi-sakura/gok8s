@@ -119,6 +119,13 @@ func NewInt32(n int) *int32 {
 	return &num
 }
 
+func Min(a int64, b int64) int64 {
+	if a > b {
+		return a
+	}
+	return b
+}
+
 type Int64 int64
 
 func (num Int64) KBtoB() int64 {

@@ -2,6 +2,7 @@ package main
 import (
 	"context"
 	"fmt"
+	cfg "github.com/buzaiguna/gok8s/config"
 	"github.com/buzaiguna/gok8s/model"
 	myProm "github.com/buzaiguna/gok8s/prom"
 	"github.com/buzaiguna/gok8s/utils"
@@ -218,7 +219,7 @@ func main() {
 		if totalTimeRequired != "" {
 			ret.TotalTimeRequired, err = utils.Float64(totalTimeRequired)
 			if err != nil {
-				panic(err.Error())
+				panic(err)
 			}
 		}
 		deployments := []*appsv1.Deployment{}
@@ -234,6 +235,53 @@ func main() {
 			default:
 			}
 		}
+
+		namespace := c.Query("namespace")
+		if namespace == "" {
+			namespace = apiv1.NamespaceDefault
+		}
+		limitRanges, err := clientSet.CoreV1().LimitRanges(namespace).List(metav1.ListOptions{})
+		if err != nil {
+			panic(err)
+		}
+		lm := model.LimitRange{int64(utils.INT_MAX), int64(utils.INT_MAX)}
+		for _, limitRange := range limitRanges.Items {
+			for _, item := range limitRange.Spec.Limits {
+				if item.Type != apiv1.LimitTypeContainer {
+					continue
+				}
+				if item.Max == nil {
+					continue
+				}
+				if maxCpu, exists := item.Max[apiv1.ResourceCPU]; exists {
+					lm.Cpu_lm = utils.Min(lm.Cpu_lm, maxCpu.MilliValue())
+				}
+				if maxMem, exists := item.Max[apiv1.ResourceMemory]; exists {
+					lm.Mem_lm = utils.Min(lm.Mem_lm, maxMem.Value())
+				}
+
+			}
+		}
+		ret.LimitRange = lm
+
+		resourceQuotas, err := clientSet.CoreV1().ResourceQuotas(namespace).List(metav1.ListOptions{})
+		if err != nil {
+			panic(err)
+		}
+		rq := model.ResourceQuota{int64(utils.INT_MAX), int64(utils.INT_MAX)}
+		for _, resourceQuota := range resourceQuotas.Items {
+			if resourceQuota.Spec.Hard == nil {
+				continue
+			}
+			if maxCpu, exists := resourceQuota.Spec.Hard[apiv1.ResourceCPU]; exists {
+				rq.Cpu_rq_total = utils.Min(rq.Cpu_rq_total, maxCpu.MilliValue())
+			}
+			if maxMem, exists := resourceQuota.Spec.Hard[apiv1.ResourceMemory]; exists {
+				rq.Mem_rq_total = utils.Min(rq.Mem_rq_total, maxMem.Value())
+			}
+		}
+		ret.ResourceQuota = rq
+
 		metricsClientSet, err := metricsclientset.NewForConfig(config)
 		if err != nil {
 			fmt.Printf("error occurred in metrics client set creating...")
@@ -380,6 +428,8 @@ func main() {
 			return
 		}
 		ret.EntrancePoint = num
+		ret.Bandwidth = cfg.Bandwidth
+
 
 		for serviceName, dependencies := range dependencyMap {
 			num := dict[serviceName]
