@@ -110,3 +110,18 @@ func TrimSpace(strs []string) []string {
 func Float64(s string) (float64, error) {
 	return strconv.ParseFloat(s, 64)
 }
+
+func NewInt32(n int) *int32 {
+	num := int32(n)
+	return &num
+}
+
+type Int64 int64
+
+func (num Int64) KB() int64 {
+	return int64(num*1024)
+}
+
+func (num Int64) MB() int64 {
+	return int64(num*1024*1024)
+}

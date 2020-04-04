@@ -9,12 +9,14 @@ import (
 	"gopkg.in/mgo.v2/bson"
 	appsv1 "k8s.io/api/apps/v1"
 	apiv1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
 	metricsclientset "k8s.io/metrics/pkg/client/clientset/versioned"
+	"math"
 	"net/http"
 	prom "github.com/prometheus/client_golang/api/prometheus/v1"
 	"strings"
@@ -396,6 +398,7 @@ func main() {
 		//todo storage
 		id := bson.NewObjectId().Hex()
 		deploymentsMap[id] = item
+		fmt.Println(deploymentsMap)
 
 		fmt.Println(id)
 		c.JSON(200, ret)
@@ -411,6 +414,56 @@ func main() {
 		fmt.Println("response string is:"+res.String())
 		c.JSON(200, res)
 	})
+
+	router.POST("/allocation", DyClientSet(config, &clientSet), func(c *gin.Context) {
+		id := c.Query("id")
+		item, exist := deploymentsMap[id]
+		if !exist {
+			c.JSON(http.StatusNotFound, "id not found")
+			return
+		}
+		allocations := []model.MicroserviceAllocation{}
+		if err := utils.Bind(c, &allocations); err != nil {
+			c.JSON(http.StatusBadRequest, err.Error())
+			return
+		}
+		ret := []*appsv1.Deployment{}
+		for _, microservice := range allocations {
+			deployment := *item.deployments[microservice.Name]
+			for num, container := range microservice.Containers {
+				newDeployment := deployment
+				newDeployment.Name = fmt.Sprintf("%s-%d", deployment.Name, num)
+				newDeployment.Spec.Replicas = utils.NewInt32(1)
+				newDeployment.Spec.Template.Spec.NodeSelector = map[string]string{}
+				newDeployment.Spec.Template.Spec.NodeSelector["kubernetes.io/hostname"] = container.Loc
+				newDeployment.Spec.Selector.MatchLabels["container-allocation-deployment"] = newDeployment.Name
+				newDeployment.Spec.Template.Labels["container-allocation-deployment"] = newDeployment.Name
+				requests := apiv1.ResourceList{}
+				requests[apiv1.ResourceCPU] = *resource.NewMilliQuantity(int64(math.Ceil(container.Cpu)), resource.DecimalSI)
+				requests[apiv1.ResourceMemory] = *resource.NewQuantity(utils.Int64(microservice.RequestMemory).MB(), resource.BinarySI)
+				newDeployment.Spec.Template.Spec.Containers[0].Resources.Requests = requests
+				newDeployment.Spec.Template.Spec.Containers[0].Resources.Limits = nil
+				ret = append(ret, &newDeployment)
+			}
+
+		}
+		for _, deployment := range ret {
+			namespace := apiv1.NamespaceDefault
+			if deployment.Namespace != "" {
+				namespace = deployment.Namespace
+			}
+			_, err := clientSet.AppsV1().Deployments(namespace).Create(deployment)
+			if err != nil {
+				fmt.Println(deployment)
+				c.JSON(http.StatusBadRequest, err.Error())
+				return
+			}
+		}
+
+
+		c.JSON(200, ret)
+	})
+
 	router.Run(":8080")
 }
 
