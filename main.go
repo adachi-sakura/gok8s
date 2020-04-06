@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	cfg "github.com/buzaiguna/gok8s/config"
+	"github.com/buzaiguna/gok8s/handlers"
+	"github.com/buzaiguna/gok8s/middleware/basic"
 	"github.com/buzaiguna/gok8s/model"
 	myProm "github.com/buzaiguna/gok8s/prom"
 	"github.com/buzaiguna/gok8s/utils"
@@ -356,6 +358,8 @@ func main() {
 				if err != nil {
 					panic(err.Error())
 				}
+			} else {
+				data.LeastResponseTime = float64(utils.INT_MAX)
 			}
 
 			deployName := deployment.Name
@@ -566,6 +570,7 @@ func main() {
 				newDeployment.Spec.Selector.MatchLabels["container-allocation-deployment"] = newDeployment.Name
 				newDeployment.Spec.Template.Labels["container-allocation-deployment"] = newDeployment.Name
 				requests := apiv1.ResourceList{}
+				apiv1.ResourceQuota{}
 				requests[apiv1.ResourceCPU] = *resource.NewMilliQuantity(int64(math.Ceil(container.Cpu)), resource.DecimalSI)
 				requests[apiv1.ResourceMemory] = *resource.NewQuantity(utils.Int64(microservice.RequestMemory).MBtoB(), resource.BinarySI)
 				newDeployment.Spec.Template.Spec.Containers[0].Resources.Requests = requests
@@ -674,4 +679,17 @@ func BuildCmdConfig( authInfo *api.AuthInfo, cfg *rest.Config) clientcmd.ClientC
 		*cmdCfg,
 		&clientcmd.ConfigOverrides{},
 	)
+}
+
+func listenAndServe() {
+	router := gin.Default()
+	router.Use(UseMiddleWares()...)
+	handlers.LoadRoutes(router)
+	router.Run(":8080")
+}
+
+func UseMiddleWares() []gin.HandlerFunc {
+	return []gin.HandlerFunc {
+		basic.Context(),
+	}
 }
