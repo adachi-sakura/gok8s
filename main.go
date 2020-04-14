@@ -6,6 +6,7 @@ import (
 	"fmt"
 	cfg "github.com/buzaiguna/gok8s/config"
 	"github.com/buzaiguna/gok8s/handlers"
+	"github.com/buzaiguna/gok8s/middleware"
 	"github.com/buzaiguna/gok8s/middleware/basic"
 	"github.com/buzaiguna/gok8s/model"
 	myProm "github.com/buzaiguna/gok8s/prom"
@@ -691,5 +692,6 @@ func listenAndServe() {
 func UseMiddleWares() []gin.HandlerFunc {
 	return []gin.HandlerFunc {
 		basic.Context(),
+		middleware.SetInClusterConfig(),
 	}
 }

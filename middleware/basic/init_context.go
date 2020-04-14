@@ -10,8 +10,8 @@ func Context() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx := context.Background()
 		ctx = appctx.WithGinContext(ctx, c)
-		c.Set("ServiceContext", ctx)
-		defer c.Set("ServiceContext", nil)
+		appctx.SetContext(c, ctx)
+		//defer c.Set("ServiceContext", nil)
 		c.Next()
 	}
 }
