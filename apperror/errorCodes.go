@@ -1,6 +1,9 @@
 package apperror
 
-import "net/http"
+import (
+	"fmt"
+	"net/http"
+)
 
 type ErrorCode string
 
@@ -10,14 +13,14 @@ const (
 	InvalidHeader				= "InvalidHeader"
 	InvalidParameter			= "InvalidParameter"
 	AuthorizationError			= "AuthorizationError"
-	InvalidRequstBody			= "InvalidRequestBody"
+	InvalidRequestBody			= "InvalidRequestBody"
 	ResourceNotFount			= "ResourceNotFound"
 )
 
 var errorCodesMap = map[ErrorCode]int {
 	InvalidHeader:		http.StatusBadRequest,
 	InvalidParameter:	http.StatusBadRequest,
-	InvalidRequstBody:	http.StatusBadRequest,
+	InvalidRequestBody:	http.StatusBadRequest,
 	NotAuthenticatedError:	http.StatusUnauthorized,
 	AuthorizationError:		http.StatusUnauthorized,
 	ResourceNotFount:		http.StatusNotFound,
@@ -48,18 +51,18 @@ func NewHeaderRequiredError(name string) *AppError {
 	return appError
 }
 
-func NewInvalidParameterError(name string) *AppError {
+func NewInvalidParameterError(name string, cause error) *AppError {
 	appError := &AppError{
 		ErrorCode:	InvalidParameter,
-		Message:	"parameter is invalid or missing "+name,
+		Message:	fmt.Sprintf("parameter is invalid: %s, cause: %s", name, cause.Error()),
 	}
 	return appError
 }
 
-func NewInvalidRequestBody() *AppError {
+func NewInvalidRequestBodyError(cause error) *AppError {
 	appError := &AppError{
-		ErrorCode:	InvalidRequstBody,
-		Message:	"request body is invalid",
+		ErrorCode:	InvalidRequestBody,
+		Message:	"request body is invalid: "+cause.Error(),
 	}
 	return appError
 }

@@ -79,10 +79,10 @@ func DecodeK8SResources(c *gin.Context) ([]runtime.Object, error) {
 			reason:	fmt.Sprintf("error occurred in request body get due to:\n%s", err.Error()),
 		}
 	}
-	return parseK8SYaml(yamlFiles), nil
+	return ParseK8SYaml(yamlFiles), nil
 }
 
-func parseK8SYaml(fileR []byte) []runtime.Object {
+func ParseK8SYaml(fileR []byte) []runtime.Object {
 	filesAsString := string(fileR[:])
 	sepYamlFiles := strings.Split(filesAsString, "---")
 	retObj := []runtime.Object{}

@@ -35,6 +35,7 @@ const (
 )
 
 func main() {
+	listenAndServe()
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		panic(err)
@@ -571,7 +572,7 @@ func main() {
 				newDeployment.Spec.Selector.MatchLabels["container-allocation-deployment"] = newDeployment.Name
 				newDeployment.Spec.Template.Labels["container-allocation-deployment"] = newDeployment.Name
 				requests := apiv1.ResourceList{}
-				apiv1.ResourceQuota{}
+
 				requests[apiv1.ResourceCPU] = *resource.NewMilliQuantity(int64(math.Ceil(container.Cpu)), resource.DecimalSI)
 				requests[apiv1.ResourceMemory] = *resource.NewQuantity(utils.Int64(microservice.RequestMemory).MBtoB(), resource.BinarySI)
 				newDeployment.Spec.Template.Spec.Containers[0].Resources.Requests = requests
@@ -692,6 +693,7 @@ func listenAndServe() {
 func UseMiddleWares() []gin.HandlerFunc {
 	return []gin.HandlerFunc {
 		basic.Context(),
+		basic.ErrorHandler(),
 		middleware.SetInClusterConfig(),
 	}
 }

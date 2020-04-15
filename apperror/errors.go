@@ -24,7 +24,7 @@ func Wrap(err interface{}) *AppError {
 	}
 	return &AppError{
 		ErrorCode:	InternalServerError,
-		Message:	"Non AppError Occurred",
+		Message:	"Non AppError Occurred: "+err.(error).Error(),
 	}
 }
 

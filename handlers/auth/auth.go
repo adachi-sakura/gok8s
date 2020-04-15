@@ -4,9 +4,8 @@ import (
 	"context"
 	"github.com/buzaiguna/gok8s/appctx"
 	"github.com/buzaiguna/gok8s/apperror"
-	"github.com/buzaiguna/gok8s/config"
 	"github.com/gin-gonic/gin"
-	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 )
 
 func validateToken(c *gin.Context) error {
@@ -25,20 +24,20 @@ func Authentication(c *gin.Context)  error {
 		return err
 	}
 	ctx := appctx.GetContextFromGin(c)
-	cli := generateClient(ctx)
-	newCtx := appctx.WithK8SClient(ctx, cli)
+	rbacConfig := generateRbacConfig(ctx)
+	newCtx := appctx.WithRbacConfig(ctx, rbacConfig)
+	//cli := appctx.NewK8SClient(newCtx)
+	//newCtx = appctx.WithK8SClient(newCtx, cli)
 	appctx.SetContext(c, newCtx)
 	return nil
 }
 
-func generateClient(ctx context.Context) *kubernetes.Clientset {
+func generateRbacConfig(ctx context.Context) *rest.Config {
 	cfg := appctx.InClusterConfig(ctx)
 	token := appctx.K8SToken(ctx)
 	cfg.BearerTokenFile = ""
 	cfg.BearerToken = token
-	clientSet := config.NewClient(cfg)
-	return clientSet
+	return cfg
 }
-
 
 var AuthHandler = appctx.GinHandler(Authentication)
