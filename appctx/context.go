@@ -4,6 +4,8 @@ import (
 	"context"
 	"github.com/buzaiguna/gok8s/config"
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/api"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 )
 
@@ -14,6 +16,9 @@ const (
 	keyK8SToken		= "k8sToken"
 	keyK8SClient	= "k8sClient"
 	keyRBACConfig	= "rbacConfig"
+	keyK8SObjects	= "k8sObjects"
+	keyMetricsClient = "metricsClient"
+	keyPromClient	= "promClient"
 )
 
 func WithGinContext(ctx context.Context, ginContext *gin.Context) context.Context {
@@ -89,3 +94,40 @@ func K8SClient(ctx context.Context) *config.K8SClient {
 	}
 	return val.(*config.K8SClient)
 }
+
+func WithMetricsClient(ctx context.Context, client *config.MetricsClient) context.Context {
+	return context.WithValue(ctx, keyMetricsClient, client)
+}
+
+func MetricsClient(ctx context.Context) *config.MetricsClient {
+	val := ctx.Value(keyMetricsClient)
+	if val == nil {
+		return nil
+	}
+	return val.(*config.MetricsClient)
+}
+
+func WithPromClient(ctx context.Context, client *api.Client) context.Context {
+	return context.WithValue(ctx, keyPromClient, client)
+}
+
+func PromClient(ctx context.Context) *api.Client {
+	val := ctx.Value(keyPromClient)
+	if val == nil {
+		return nil
+	}
+	return val.(*api.Client)
+}
+
+func WithK8SObjects(ctx context.Context, objects []runtime.Object) context.Context {
+	return context.WithValue(ctx, keyK8SObjects, objects)
+}
+
+func K8SObjects(ctx context.Context) []runtime.Object {
+	val := ctx.Value(keyK8SObjects)
+	if val == nil {
+		return nil
+	}
+	return val.([]runtime.Object)
+}
+
