@@ -1,5 +1,10 @@
 package model
 
+import (
+	"github.com/buzaiguna/gok8s/utils"
+	v1 "k8s.io/api/core/v1"
+)
+
 type (
 	ResourceQuota struct {
 		Cpu_rq_total	int64	`json:"cpu_rq_total"`
@@ -69,3 +74,50 @@ type (
 
 
 )
+
+func NewLimitRange(limitRanges *v1.LimitRangeList) LimitRange {
+	lm := LimitRange{utils.INT64_MAX, utils.INT64_MAX}
+	for _, limitRange := range limitRanges.Items {
+		for _, item := range limitRange.Spec.Limits {
+			if item.Type != v1.LimitTypeContainer {
+				continue
+			}
+			if item.Max == nil {
+				continue
+			}
+			if maxCpu, exists := item.Max[v1.ResourceCPU]; exists {
+				lm.Cpu_lm = utils.Int64Min(lm.Cpu_lm, maxCpu.MilliValue())
+			}
+			if maxMem, exists := item.Max[v1.ResourceMemory]; exists {
+				lm.Mem_lm = utils.Int64Min(lm.Mem_lm, maxMem.Value())
+			}
+		}
+	}
+	return lm
+}
+
+func NewResourceQuota(resourceQuotas *v1.ResourceQuotaList) ResourceQuota {
+	rq := ResourceQuota{utils.INT64_MAX, utils.INT64_MAX}
+	for _, resourceQuota := range resourceQuotas.Items {
+		if resourceQuota.Spec.Hard == nil {
+			continue
+		}
+		if maxCpu, exists := resourceQuota.Spec.Hard[v1.ResourceCPU]; exists {
+			rq.Cpu_rq_total = utils.Int64Min(rq.Cpu_rq_total, maxCpu.MilliValue())
+		}
+		if maxMem, exists := resourceQuota.Spec.Hard[v1.ResourceMemory]; exists {
+			rq.Mem_rq_total = utils.Int64Min(rq.Mem_rq_total, maxMem.Value())
+		}
+	}
+	return rq
+}
+
+func (this *AlgorithmParameters) SetTotalTimeRequired(str string) error {
+	if str == "" {
+		this.TotalTimeRequired = float64(utils.INT_MAX)
+		return nil
+	}
+	var err error
+	this.TotalTimeRequired, err = utils.Float64(str)
+	return err
+}
