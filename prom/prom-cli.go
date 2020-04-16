@@ -12,7 +12,7 @@ import (
 
 var promCli api.Client
 
-func ConnectProm() api.Client {
+func PrometheusClient() api.Client {
 	if promCli != nil {
 		return promCli
 	}
@@ -43,7 +43,7 @@ func getPromCliWithENV(host string, port string) (api.Client, error) {
 }
 
 func Query(query string, t time.Time) (model.Value, error) {
-	cli := ConnectProm()
+	cli := PrometheusClient()
 	res, _, err := prom.NewAPI(cli).Query(context.Background(), query, t)
 	return res, err
 }

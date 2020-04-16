@@ -19,7 +19,10 @@ import (
 const (
 	INT_MAX = int(^uint(0) >> 1)
 	INT_MIN = int(^INT_MAX)
+	INT64_MAX = int64(INT_MAX)
+	INT64_MIN = int64(INT_MIN)
 )
+
 
 type BindError struct {
 	reason string
@@ -119,7 +122,14 @@ func NewInt32(n int) *int32 {
 	return &num
 }
 
-func Min(a int64, b int64) int64 {
+func Int64Min(a int64, b int64) int64 {
+	if a > b {
+		return b
+	}
+	return a
+}
+
+func Int64Max(a int64, b int64) int64 {
 	if a > b {
 		return a
 	}

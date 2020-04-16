@@ -157,7 +157,7 @@ func main() {
 
 	})
 	router.GET("/prom/api-request-total", func(c *gin.Context) {
-		cli := myProm.ConnectProm()
+		cli := myProm.PrometheusClient()
 		t := time.Now()
 		r := prom.Range{
 			Start:	t.Add(-3*time.Hour),
@@ -261,10 +261,10 @@ func main() {
 					continue
 				}
 				if maxCpu, exists := item.Max[apiv1.ResourceCPU]; exists {
-					lm.Cpu_lm = utils.Min(lm.Cpu_lm, maxCpu.MilliValue())
+					lm.Cpu_lm = utils.Int64Min(lm.Cpu_lm, maxCpu.MilliValue())
 				}
 				if maxMem, exists := item.Max[apiv1.ResourceMemory]; exists {
-					lm.Mem_lm = utils.Min(lm.Mem_lm, maxMem.Value())
+					lm.Mem_lm = utils.Int64Min(lm.Mem_lm, maxMem.Value())
 				}
 
 			}
@@ -281,10 +281,10 @@ func main() {
 				continue
 			}
 			if maxCpu, exists := resourceQuota.Spec.Hard[apiv1.ResourceCPU]; exists {
-				rq.Cpu_rq_total = utils.Min(rq.Cpu_rq_total, maxCpu.MilliValue())
+				rq.Cpu_rq_total = utils.Int64Min(rq.Cpu_rq_total, maxCpu.MilliValue())
 			}
 			if maxMem, exists := resourceQuota.Spec.Hard[apiv1.ResourceMemory]; exists {
-				rq.Mem_rq_total = utils.Min(rq.Mem_rq_total, maxMem.Value())
+				rq.Mem_rq_total = utils.Int64Min(rq.Mem_rq_total, maxMem.Value())
 			}
 		}
 		ret.ResourceQuota = rq
