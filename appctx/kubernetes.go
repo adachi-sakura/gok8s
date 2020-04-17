@@ -7,7 +7,10 @@ import (
 	"github.com/buzaiguna/gok8s/utils"
 	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/kubernetes/pkg/apis/core"
+)
+
+const (
+	NULL	= 0
 )
 
 func BindK8SYaml(ctx context.Context, obj interface{}) error {
@@ -19,7 +22,7 @@ func BindK8SYaml(ctx context.Context, obj interface{}) error {
 	return nil
 }
 
-func DecodeMultiK8SResource(ctx context.Context) context.Context {
+func MultiK8SResourceContext(ctx context.Context) context.Context {
 	c := GinContext(ctx)
 	yamlFiles := getYamlBody(c)
 	objects := utils.ParseK8SYaml(yamlFiles)
@@ -50,4 +53,42 @@ func ServiceObjects(ctx context.Context) []*corev1.Service {
 		}
 	}
 	return services
+}
+
+func DeploymentInvertedIndexContext(ctx context.Context, deployments []*v1.Deployment) context.Context {
+	mNameToIndex := map[string]int{}
+	for num, deployment := range deployments {
+		mNameToIndex[deployment.Name] = num
+	}
+	newCtx := WithDeploymentIndex(ctx, mNameToIndex)
+	return newCtx
+}
+
+func GetDeploymentIndex(ctx context.Context, deploymentName string) (int, error) {
+	mNameToIndex := DeploymentIndex(ctx)
+	if mNameToIndex == nil {
+		return NULL, apperror.NewInternalServerError("deployment map is nil")
+	}
+	index, exists := mNameToIndex[deploymentName]
+	if !exists {
+		return NULL, apperror.NewResourceNotFoundError("deployment "+deploymentName)
+	}
+	return index, nil
+}
+
+func GetDeploymentsIndexes(ctx context.Context, deploymentNames ...string) ([]int, error) {
+	indexes := []int{}
+	mNameToIndex := DeploymentIndex(ctx)
+	if mNameToIndex == nil {
+		return nil, apperror.NewInternalServerError("deployment map is nil")
+	}
+	for _, name := range deploymentNames {
+		index, exists := mNameToIndex[name]
+		if !exists {
+			return nil, apperror.NewResourceNotFoundError("deployment "+name)
+		}
+		indexes = append(indexes, index)
+	}
+
+	return indexes, nil
 }

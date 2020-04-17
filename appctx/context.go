@@ -3,8 +3,9 @@ package appctx
 import (
 	"context"
 	"github.com/buzaiguna/gok8s/config"
+	"github.com/buzaiguna/gok8s/model"
 	"github.com/gin-gonic/gin"
-	"github.com/prometheus/client_golang/api"
+	v1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 )
@@ -19,6 +20,9 @@ const (
 	keyK8SObjects	= "k8sObjects"
 	keyMetricsClient = "metricsClient"
 	keyPromClient	= "promClient"
+	keyNodesMap		= "nodesMap"
+	keyDeployments	= "deployments"
+	keyDeploymentIndex = "deploymentIndex"
 )
 
 func WithGinContext(ctx context.Context, ginContext *gin.Context) context.Context {
@@ -107,16 +111,16 @@ func MetricsClient(ctx context.Context) *config.MetricsClient {
 	return val.(*config.MetricsClient)
 }
 
-func WithPromClient(ctx context.Context, client *api.Client) context.Context {
+func WithPromClient(ctx context.Context, client *config.PromClient) context.Context {
 	return context.WithValue(ctx, keyPromClient, client)
 }
 
-func PromClient(ctx context.Context) *api.Client {
+func PromClient(ctx context.Context) *config.PromClient{
 	val := ctx.Value(keyPromClient)
 	if val == nil {
 		return nil
 	}
-	return val.(*api.Client)
+	return val.(*config.PromClient)
 }
 
 func WithK8SObjects(ctx context.Context, objects []runtime.Object) context.Context {
@@ -129,5 +133,41 @@ func K8SObjects(ctx context.Context) []runtime.Object {
 		return nil
 	}
 	return val.([]runtime.Object)
+}
+
+func WithNodesMap(ctx context.Context, m map[string]*model.Node) context.Context {
+	return context.WithValue(ctx, keyNodesMap, m)
+}
+
+func NodesMap(ctx context.Context) map[string]*model.Node {
+	val := ctx.Value(keyNodesMap)
+	if val == nil {
+		return nil
+	}
+	return val.(map[string]*model.Node)
+}
+
+func WithDeployments(ctx context.Context, deployments []*v1.Deployment) context.Context {
+	return context.WithValue(ctx, keyDeployments, deployments)
+}
+
+func Deployments(ctx context.Context) []*v1.Deployment {
+	val := ctx.Value(keyDeployments)
+	if val == nil {
+		return nil
+	}
+	return val.([]*v1.Deployment)
+}
+
+func WithDeploymentIndex(ctx context.Context, mNameToIndex map[string]int) context.Context {
+	return context.WithValue(ctx, keyDeploymentIndex, mNameToIndex)
+}
+
+func DeploymentIndex(ctx context.Context) map[string]int {
+	val := ctx.Value(keyDeploymentIndex)
+	if val == nil {
+		return nil
+	}
+	return val.(map[string]int)
 }
 

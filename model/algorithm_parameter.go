@@ -75,6 +75,22 @@ type (
 
 )
 
+func NewMicroserviceYaml() *MicroserviceYaml {
+	return &MicroserviceYaml{
+		MicroservicesToInvoke: []int{},
+	}
+}
+
+func (this *MicroserviceYaml) SetLeastResponseTime(str string) error {
+	if str == "" {
+		this.LeastResponseTime = float64(utils.INT_MAX)
+		return nil
+	}
+	var err error
+	this.LeastResponseTime, err = utils.Float64(str)
+	return err
+}
+
 func NewLimitRange(limitRanges *v1.LimitRangeList) LimitRange {
 	lm := LimitRange{utils.INT64_MAX, utils.INT64_MAX}
 	for _, limitRange := range limitRanges.Items {

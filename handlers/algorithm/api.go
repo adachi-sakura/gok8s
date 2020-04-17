@@ -4,8 +4,23 @@ import (
 	"context"
 	"github.com/buzaiguna/gok8s/appctx"
 	"github.com/buzaiguna/gok8s/apperror"
+	"github.com/buzaiguna/gok8s/config"
 	"github.com/buzaiguna/gok8s/model"
+	"github.com/buzaiguna/gok8s/prom"
+	"github.com/buzaiguna/gok8s/utils"
+	"errors"
+	appsv1 "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/metrics/pkg/apis/metrics/v1beta1"
 	"net/http"
+	"time"
+)
+
+const (
+	nodeMasterRole	= "node-role.kubernetes.io/master"
+	dependencyLabel = "dependencies"
+	leastResponseTimeLabel	= "leastResponseTime"
+	tenMinsDuration	= "10m"
 )
 
 func GetMetrics(ctx context.Context) error {
@@ -17,63 +32,339 @@ func GetMetrics(ctx context.Context) error {
 	return nil
 }
 
-type buildFunc func(context.Context, *model.AlgorithmParameters) (context.Context, error)
+type buildFunc func(context.Context, *model.AlgorithmParameters) error
 
 func buildAlgorithmParameters(ctx context.Context) (context.Context, *model.AlgorithmParameters, error) {
+	ctx = buildCliContext(ctx)
+	ctx = buildDeploymentsContext(ctx)
 	funcs := buildingPipeline()
 	metrics := &model.AlgorithmParameters{}
-	var err error
 	for _, fun := range funcs {
-		ctx, err = fun(ctx, metrics)
-		if err != nil {
+		if err := fun(ctx, metrics); err != nil {
 			return nil, nil, err
 		}
 	}
 	return ctx, metrics, nil
 }
 
-func buildCli(ctx context.Context, metrics *model.AlgorithmParameters) (context.Context, error) {
+func buildCliContext(ctx context.Context) context.Context {
 	newCtx := appctx.K8SClientContext(ctx)
 	newCtx = appctx.MetricsClientContext(newCtx)
 	newCtx = appctx.PromClientContext(newCtx)
-	return newCtx, nil
+	return newCtx
 }
 
-func buildTotalTimeRequired(ctx context.Context, metrics *model.AlgorithmParameters) (context.Context, error) {
+func buildDeploymentsContext(ctx context.Context) context.Context {
+	ctx = appctx.MultiK8SResourceContext(ctx)
+	deployments := appctx.DeploymentObjects(ctx)
+	ctx = appctx.WithDeployments(ctx, deployments)
+	ctx = appctx.DeploymentInvertedIndexContext(ctx, deployments)
+	return ctx
+}
+
+func buildTotalTimeRequired(ctx context.Context, metrics *model.AlgorithmParameters) error {
 	totalTimeRequired := appctx.Query(ctx, "totalTime")
 	if err := metrics.SetTotalTimeRequired(totalTimeRequired); err != nil {
-		return nil, apperror.NewInvalidParameterError("totalTime", err)
+		return apperror.NewInvalidParameterError("totalTime", err)
 	}
-	return ctx, nil
+	return nil
 }
 
-func buildLimitRange(ctx context.Context, metrics *model.AlgorithmParameters) (context.Context, error) {
+func buildLimitRange(ctx context.Context, metrics *model.AlgorithmParameters) error {
 	namespace := appctx.Query(ctx, "namespace")
 	k8sCli := appctx.K8SClient(ctx)
 	limitRanges, err := k8sCli.ListLimitRange(namespace)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	metrics.LimitRange = model.NewLimitRange(limitRanges)
-	return ctx, nil
+	return nil
 }
 
-func buildResourceQuota(ctx context.Context, metrics *model.AlgorithmParameters) (context.Context, error) {
+func buildResourceQuota(ctx context.Context, metrics *model.AlgorithmParameters) error {
 	namespace := appctx.Query(ctx, "namespace")
 	k8sCli := appctx.NewK8SClient(ctx)
 	resourceQuotas, err := k8sCli.ListResourceQuota(namespace)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	metrics.ResourceQuota = model.NewResourceQuota(resourceQuotas)
-	return ctx, nil
+	return nil
+}
+
+func buildNodeParam(ctx context.Context, metrics *model.AlgorithmParameters) error {
+	nodesMetrics, err := getNodesMetrics(ctx)
+	if err != nil {
+		return err
+	}
+	nodesStatus, err := getNodesStatus(ctx)
+	if err != nil {
+		return err
+	}
+
+	nodesMap := map[string]*model.Node{}
+	loadNodesStatus(&nodesMap, nodesStatus)
+	loadNodesMetrics(&nodesMap, nodesMetrics)
+	nodes := []*model.Node{}
+	for _, node := range nodesMap {
+		nodes = append(nodes, node)
+	}
+	metrics.Nodes = nodes
+
+	return nil
+}
+
+func loadNodesMetrics(nodesMap *map[string]*model.Node, metricses []v1beta1.NodeMetrics) {
+	for _, metrics := range metricses {
+		if _, exist := (*nodesMap)[metrics.Name]; !exist {
+			continue
+		}
+		(*nodesMap)[metrics.Name].Current_cpu = metrics.Usage.Cpu().MilliValue()
+		(*nodesMap)[metrics.Name].Current_mem = utils.Int64(metrics.Usage.Memory().Value()).BtoMB()
+	}
+}
+
+func loadNodesStatus(nodesMap *map[string]*model.Node, nodesStatus []v1.Node) {
+	for _, nodeStatus := range nodesStatus {
+		if _, exist := nodeStatus.Labels[nodeMasterRole]; exist {
+			continue
+		}
+		(*nodesMap)[nodeStatus.Name] = &model.Node{
+			Name:	nodeStatus.Name,
+			Sum_cpu:	nodeStatus.Status.Capacity.Cpu().MilliValue(),
+			Allocatable_cpu:	nodeStatus.Status.Allocatable.Cpu().MilliValue(),
+			Sum_mem:	utils.Int64(nodeStatus.Status.Capacity.Memory().Value()).BtoMB(),
+			Allocatable_mem:	utils.Int64(nodeStatus.Status.Allocatable.Memory().Value()).BtoMB(),
+		}
+	}
+}
+
+func getNodesMetrics(ctx context.Context) ([]v1beta1.NodeMetrics, error) {
+	metricsCli := appctx.MetricsClient(ctx)
+	metricsList, err := metricsCli.ListNodeMetrics()
+	if err != nil {
+		return nil, err
+	}
+	return metricsList.Items, nil
+}
+
+func getNodesStatus(ctx context.Context) ([]v1.Node, error) {
+	k8sCli := appctx.K8SClient(ctx)
+	nodeList, err := k8sCli.ListNodes()
+	if err != nil {
+		return nil, err
+	}
+	return nodeList.Items, nil
+}
+
+func buildMicroserviceParam(ctx context.Context, metrics *model.AlgorithmParameters) error {
+	deployments := appctx.Deployments(ctx)
+
+	if err := validate(ctx); err != nil {
+		return err
+	}
+	datas := []*model.MicroservcieData{}
+	for _, deployment := range deployments {
+		yamlData, err := buildMicroserviceYaml(ctx, deployment)
+		if err != nil {
+			return err
+		}
+		metricsData, err := buildMicroserviceMetrics(ctx, deployment)
+		if err != nil {
+			return err
+		}
+		data := &model.MicroservcieData{
+			MicroserviceYaml:		*yamlData,
+			MicroserviceMetrics:	*metricsData,
+		}
+		datas = append(datas, data)
+	}
+	metrics.Datas = datas
+	return nil
+}
+
+func buildMicroserviceMetrics(ctx context.Context, deployment *appsv1.Deployment) (*model.MicroserviceMetrics, error) {
+	metrics := &model.MicroserviceMetrics{}
+	t := time.Now()
+
+	funcs := buildingMetricsPipeline()
+	for _, fun := range funcs {
+		if err := fun(ctx, metrics, deployment, t); err != nil {
+			return nil, err
+		}
+	}
+	return metrics, nil
+}
+
+type promBuildFunc func(context.Context, *model.MicroserviceMetrics, *appsv1.Deployment, time.Time) error
+
+func buildingMetricsPipeline() []promBuildFunc {
+	return []promBuildFunc{
+		loadContainerReceiveTotal,
+		loadContainerTransmitTotal,
+		loadContainerCpuUsageSecTotal,
+		loadHttpRequestsTotal,
+		loadContainerMemUsageMax,
+	}
+}
+
+func loadContainerReceiveTotal(ctx context.Context, metrics *model.MicroserviceMetrics, deployment *appsv1.Deployment, t time.Time) error {
+	cli := appctx.PromClient(ctx)
+	deployName := deployment.Name
+	duration := tenMinsDuration
+	res, err := cli.ContainerReceiveTotal(deployName, t, duration)
+	if err != nil {
+		return err
+	}
+	matVals := prom.GetMatrixValues(res)
+	receive := prom.SumIncrement(matVals...)/1024
+
+	metrics.Receive = receive
+	return nil
+}
+
+func loadContainerTransmitTotal(ctx context.Context, metrics *model.MicroserviceMetrics, deployment *appsv1.Deployment, t time.Time) error {
+	cli := appctx.PromClient(ctx)
+	deployName := deployment.Name
+	duration := tenMinsDuration
+	res, err := cli.ContainerTransmitTotal(deployName, t, duration)
+	if err != nil {
+		return err
+	}
+	matVals := prom.GetMatrixValues(res)
+	transmit := prom.SumIncrement(matVals...)/1024
+
+	metrics.Transmit = transmit
+	return nil
+}
+
+func loadContainerCpuUsageSecTotal(ctx context.Context, metrics *model.MicroserviceMetrics, deployment *appsv1.Deployment, t time.Time) error {
+	cli := appctx.PromClient(ctx)
+	deployName := deployment.Name
+	duration := tenMinsDuration
+	containerName := deployment.Spec.Template.Spec.Containers[0].Name
+
+	res, err := cli.ContainerCpuUsageSecTotal(deployName, containerName, t, duration)
+	if err != nil {
+		return err
+	}
+	matValues := prom.GetMatrixValues(res)
+	cpuUsageTime := prom.SumIncrement(matValues...)
+	cpuTimeTotal := prom.SumElapsedTime(matValues...)
+
+	metrics.CpuUsageTime = cpuUsageTime
+	metrics.CpuTimeTotal = cpuTimeTotal
+	return nil
+}
+
+func loadHttpRequestsTotal(ctx context.Context, metrics *model.MicroserviceMetrics, deployment *appsv1.Deployment, t time.Time) error {
+	cli := appctx.PromClient(ctx)
+	deployName := deployment.Name
+	duration := tenMinsDuration
+
+	res, err := cli.HttpRequestsTotal(deployName, t, duration)
+	if err != nil {
+		return err
+	}
+	matValues := prom.GetMatrixValues(res)
+	httpRequestsCount := int(prom.SumIncrement(matValues...))
+
+	metrics.HttpRequestsCount = httpRequestsCount
+	return nil
+}
+
+func loadContainerMemUsageMax(ctx context.Context, metrics *model.MicroserviceMetrics, deployment *appsv1.Deployment, t time.Time) error {
+	cli := appctx.PromClient(ctx)
+	deployName := deployment.Name
+	containerName := deployment.Spec.Template.Spec.Containers[0].Name
+
+	res, err := cli.ContainerMemUsageMax(deployName, containerName, t)
+	if err != nil {
+		return err
+	}
+	vecValues := prom.GetVectorValues(res)
+	max := prom.Max(vecValues...)
+	maxMemoryUsage := float64(max)/1024/1024
+
+	metrics.MaxMemoryUsage = maxMemoryUsage
+	return nil
+}
+
+func buildMicroserviceYaml(ctx context.Context, deployment *appsv1.Deployment) (*model.MicroserviceYaml, error) {
+	yamlData := model.NewMicroserviceYaml()
+	yamlData.Replicas = *deployment.Spec.Replicas
+	leastResponseTime := deployment.Labels[leastResponseTimeLabel]
+	if err := yamlData.SetLeastResponseTime(leastResponseTime); err != nil {
+		return nil, err
+	}
+	dependencies := deployment.Labels[dependencyLabel]
+	if dependencies != "" {
+		dependencyArr := utils.Split(dependencies, ",")
+		indexes, err := appctx.GetDeploymentsIndexes(ctx, dependencyArr...)
+		if err != nil {
+			return nil, err
+		}
+		yamlData.MicroservicesToInvoke = append(yamlData.MicroservicesToInvoke, indexes...)
+	}
+	return yamlData, nil
+}
+
+func validate(ctx context.Context) error {
+	dependenciesMap := map[string][]string{}
+	deployments := appctx.Deployments(ctx)
+	dict := map[string]bool{}
+	//no duplicate deployment
+	for _, deployment := range deployments {
+		dependencies := deployment.Labels[dependencyLabel]
+		deployName := deployment.Name
+		if _, exists := dict[deployName]; exists {
+			return apperror.NewInvalidRequestBodyError(errors.New("duplicate deployment name "+deployName))
+		}
+		dict[deployName] = true
+		if dependencies != "" {
+			dependencyArr := utils.Split(dependencies, ",")
+			dependenciesMap[deployName] = append(dependenciesMap[deployName], dependencyArr...)
+		}
+	}
+
+	//depended microservice exists (no loop dependency check)
+	for _, dependencies := range dependenciesMap {
+		for _, nextDeploy := range dependencies {
+			_, exists := dict[nextDeploy]
+			if !exists {
+				return apperror.NewInvalidRequestBodyError(errors.New("depended deploy not found "+nextDeploy))
+			}
+		}
+	}
+
+	return nil
+}
+
+func buildBandwidth(ctx context.Context, metrics *model.AlgorithmParameters) error {
+	metrics.Bandwidth = config.Bandwidth
+	return nil
+}
+
+func buildEntrance(ctx context.Context, metrics *model.AlgorithmParameters) error {
+	entrance := appctx.Query(ctx, "entry")
+	if entrance == "" {
+		return apperror.NewParameterRequiredError("entry query")
+	}
+	_, err := appctx.GetDeploymentIndex(ctx, entrance)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func buildingPipeline() []buildFunc {
 	return []buildFunc{
-		buildCli,
 		buildTotalTimeRequired,
 		buildLimitRange,
 		buildResourceQuota,
+		buildNodeParam,
+		buildMicroserviceParam,
+		buildEntrance,
+		buildBandwidth,
 	}
 }
