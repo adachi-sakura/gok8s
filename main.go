@@ -1,7 +1,6 @@
 package main
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	cfg "github.com/buzaiguna/gok8s/config"
@@ -12,7 +11,6 @@ import (
 	myProm "github.com/buzaiguna/gok8s/prom"
 	"github.com/buzaiguna/gok8s/utils"
 	"github.com/gin-gonic/gin"
-	prom "github.com/prometheus/client_golang/api/prometheus/v1"
 	"gopkg.in/mgo.v2/bson"
 	"io/ioutil"
 	appsv1 "k8s.io/api/apps/v1"
@@ -51,127 +49,7 @@ func main() {
 	deploymentsMap := map[string]mapItem{}
 
 	router := gin.Default()
-	router.GET("/ping", func(c *gin.Context) {
-		c.String(http.StatusOK, "PONG")
-	})
-	router.GET("/admin/first-pod", func(c *gin.Context) {
-		config, err := rest.InClusterConfig()
-		if err != nil {
-			fmt.Println("error occurred in cluster config...")
-			panic(err)
-		}
-		clientSet, err := kubernetes.NewForConfig(config)
-		if err != nil {
-			fmt.Println("error occurred in clientSet creating...")
-			panic(err)
-		}
-		fmt.Printf("ClientSet: %v\n", clientSet)
-		pods, err := clientSet.CoreV1().Pods("").List(metav1.ListOptions{})
-		if err != nil {
-			c.JSON(http.StatusBadRequest, err)
-			return
-		}
-		c.JSON(http.StatusOK, pods.Items[0])
 
-	})
-	router.GET("/pods", DynamicClientSet(config, &clientSet), func(c *gin.Context) {
-		pods, err := clientSet.CoreV1().Pods("").List(metav1.ListOptions{})
-		if err != nil {
-			c.JSON(http.StatusBadRequest, err.Error())
-			return
-		}
-		c.JSON(http.StatusOK, pods)
-
-	})
-	router.GET("/first-pod", DynamicClientSet(config, &clientSet), func(c *gin.Context) {
-		fmt.Printf("clientSet used: %v\n", *clientSet)
-		pods, err := clientSet.CoreV1().Pods("").List(metav1.ListOptions{})
-		if err != nil {
-			c.JSON(http.StatusBadRequest, err.Error())
-			return
-		}
-		c.JSON(http.StatusOK, pods.Items[0])
-
-	})
-	router.GET("/test/first-pod", DyClientSet(config, &clientSet), func(c *gin.Context) {
-		fmt.Printf("clientSet used: %v\n", *clientSet)
-		pods, err := clientSet.CoreV1().Pods("").List(metav1.ListOptions{})
-		if err != nil {
-			c.JSON(http.StatusBadRequest, err.Error())
-			return
-		}
-		c.JSON(http.StatusOK, pods.Items[0])
-
-	})
-	router.GET("/metrics/nodes", DyClientSet(config, &clientSet), func(c *gin.Context) {
-		metricsClientSet, err := metricsclientset.NewForConfig(config)
-		if err != nil {
-			fmt.Printf("error occurred in metrics client set creating...")
-			panic(err)
-		}
-		metrics, err := metricsClientSet.MetricsV1beta1().NodeMetricses().List(metav1.ListOptions{})
-		if err != nil {
-			fmt.Printf("error occurred in metrics list...")
-			c.JSON(http.StatusBadRequest, err.Error())
-		}
-		c.JSON(http.StatusOK, metrics)
-
-	})
-	router.GET("/metrics/nodes/:nodeName", DyClientSet(config, &clientSet), func(c *gin.Context) {
-		metricsClientSet, err := metricsclientset.NewForConfig(config)
-		if err != nil {
-			fmt.Printf("error occurred in metrics client set creating...")
-			panic(err)
-		}
-		name := c.Param("nodeName")
-		metrics, err := metricsClientSet.MetricsV1beta1().NodeMetricses().Get(name, metav1.GetOptions{})
-		if err != nil {
-			fmt.Printf("error occurred in metrics get...")
-			c.JSON(http.StatusBadRequest, err.Error())
-		}
-		fmt.Println(metrics.Usage[apiv1.ResourceCPU])
-		c.JSON(http.StatusOK, metrics)
-
-	})
-	router.GET("/nodes/:nodeName", DyClientSet(config, &clientSet), func(c *gin.Context) {
-
-		name := c.Param("nodeName")
-		node, _ := clientSet.CoreV1().Nodes().Get(name, metav1.GetOptions{})
-		fmt.Println(node.Status.Capacity[apiv1.ResourceCPU])
-		fmt.Println(node.Status.Allocatable[apiv1.ResourceMemory])
-		c.JSON(http.StatusOK, node)
-
-	})
-	router.GET("/metrics/pods", DyClientSet(config, &clientSet), func(c *gin.Context) {
-		metricsClientSet, err := metricsclientset.NewForConfig(config)
-		if err != nil {
-			fmt.Printf("error occurred in metrics client set creating...")
-			panic(err)
-		}
-		metrics, err := metricsClientSet.MetricsV1beta1().PodMetricses(metav1.NamespaceDefault).List(metav1.ListOptions{})
-		if err != nil {
-			fmt.Printf("error occurred in metrics list...")
-			c.JSON(http.StatusBadRequest, err.Error())
-		}
-		c.JSON(http.StatusOK, metrics)
-
-	})
-	router.GET("/prom/api-request-total", func(c *gin.Context) {
-		cli := myProm.PrometheusClient()
-		t := time.Now()
-		r := prom.Range{
-			Start:	t.Add(-3*time.Hour),
-			End:	t,
-			Step:	time.Hour,
-
-		}
-		res, _, err := prom.NewAPI(cli).QueryRange(context.Background(), "apiserver_request_total", r)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, err)
-			return
-		}
-		c.JSON(200, res)
-	})
 	router.POST("/deployments", DynamicClientSet(config, &clientSet), func(c * gin.Context) {
 		deployment := &appsv1.Deployment{}
 		if err := utils.Bind(c, deployment); err != nil {
@@ -535,17 +413,6 @@ func main() {
 
 
 		c.JSON(200, allocations)
-	})
-	router.GET("/max-memory", func(c *gin.Context) {
-		containerName := c.Query("container")
-		query := fmt.Sprintf("container_memory_max_usage_bytes{ container = \"%s\"}", containerName)
-		res, err := myProm.Query(query, time.Now())
-		if err != nil {
-			panic(err.Error())
-		}
-		fmt.Println("response type is: "+res.Type().String())
-		fmt.Println("response string is:"+res.String())
-		c.JSON(200, res)
 	})
 
 	router.POST("/allocation", DyClientSet(config, &clientSet), func(c *gin.Context) {
