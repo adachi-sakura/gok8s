@@ -3,7 +3,6 @@ package appctx
 import (
 	"context"
 	"github.com/buzaiguna/gok8s/config"
-	"github.com/buzaiguna/gok8s/prom"
 )
 
 func NewK8SClient(ctx context.Context) *config.K8SClient {
@@ -38,12 +37,16 @@ func MetricsClientContext(ctx context.Context) context.Context {
 	return newCtx
 }
 
+func NewPromClient(ctx context.Context) *config.PromClient {
+	return config.NewPromClient()
+}
+
 func PromClientContext(ctx context.Context) context.Context {
 	cli := PromClient(ctx)
 	if cli != nil {
 		return ctx
 	}
-	newCli := prom.PrometheusClient()
-	newCtx := WithPromClient(ctx, &newCli)
+	newCli := NewPromClient(ctx)
+	newCtx := WithPromClient(ctx, newCli)
 	return newCtx
 }
