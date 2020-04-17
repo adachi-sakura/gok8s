@@ -150,6 +150,12 @@ func (num Int64) MBtoB() int64 {
 	return int64(num*1024*1024)
 }
 
+func (num Int64) BtoMB() int64 {
+	return int64(num/1024/1024)
+}
+
+
+
 func GetSelectedLineInFile(path string, num int) (string, error) {
 	file, err := os.Open(path)
 	if err != nil {
@@ -164,4 +170,9 @@ func GetSelectedLineInFile(path string, num int) (string, error) {
 		}
 	}
 	return reader.ReadString('\n')
+}
+
+func Split(str string, sep string) []string {
+	arr := strings.Split(str, sep)
+	return TrimSpace(arr)
 }
