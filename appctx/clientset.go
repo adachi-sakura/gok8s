@@ -2,12 +2,12 @@ package appctx
 
 import (
 	"context"
-	"github.com/buzaiguna/gok8s/config"
+	"github.com/buzaiguna/gok8s/appclient"
 )
 
-func NewK8SClient(ctx context.Context) *config.K8SClient {
+func NewK8SClient(ctx context.Context) *appclient.K8SClient {
 	cfg := RbacConfig(ctx)
-	clientSet := config.NewK8SClient(cfg)
+	clientSet := appclient.NewK8SClient(cfg)
 	return clientSet
 }
 
@@ -21,9 +21,9 @@ func K8SClientContext(ctx context.Context) context.Context {
 	return newCtx
 }
 
-func NewMetricsClient(ctx context.Context) *config.MetricsClient {
+func NewMetricsClient(ctx context.Context) *appclient.MetricsClient {
 	cfg := RbacConfig(ctx)
-	clientSet := config.NewMetricsClient(cfg)
+	clientSet := appclient.NewMetricsClient(cfg)
 	return clientSet
 }
 
@@ -37,8 +37,8 @@ func MetricsClientContext(ctx context.Context) context.Context {
 	return newCtx
 }
 
-func NewPromClient(ctx context.Context) *config.PromClient {
-	return config.NewPromClient()
+func NewPromClient(ctx context.Context) *appclient.PromClient {
+	return appclient.NewPromClient()
 }
 
 func PromClientContext(ctx context.Context) context.Context {

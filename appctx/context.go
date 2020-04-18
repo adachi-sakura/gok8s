@@ -2,7 +2,7 @@ package appctx
 
 import (
 	"context"
-	"github.com/buzaiguna/gok8s/config"
+	"github.com/buzaiguna/gok8s/appclient"
 	"github.com/buzaiguna/gok8s/model"
 	"github.com/gin-gonic/gin"
 	v1 "k8s.io/api/apps/v1"
@@ -87,40 +87,40 @@ func K8SToken(ctx context.Context) string {
 	return val.(string)
 }
 
-func WithK8SClient(ctx context.Context, client *config.K8SClient) context.Context {
+func WithK8SClient(ctx context.Context, client *appclient.K8SClient) context.Context {
 	return context.WithValue(ctx, keyK8SClient, client)
 }
 
-func K8SClient(ctx context.Context) *config.K8SClient {
+func K8SClient(ctx context.Context) *appclient.K8SClient {
 	val := ctx.Value(keyK8SClient)
 	if val == nil {
 		return nil
 	}
-	return val.(*config.K8SClient)
+	return val.(*appclient.K8SClient)
 }
 
-func WithMetricsClient(ctx context.Context, client *config.MetricsClient) context.Context {
+func WithMetricsClient(ctx context.Context, client *appclient.MetricsClient) context.Context {
 	return context.WithValue(ctx, keyMetricsClient, client)
 }
 
-func MetricsClient(ctx context.Context) *config.MetricsClient {
+func MetricsClient(ctx context.Context) *appclient.MetricsClient {
 	val := ctx.Value(keyMetricsClient)
 	if val == nil {
 		return nil
 	}
-	return val.(*config.MetricsClient)
+	return val.(*appclient.MetricsClient)
 }
 
-func WithPromClient(ctx context.Context, client *config.PromClient) context.Context {
+func WithPromClient(ctx context.Context, client *appclient.PromClient) context.Context {
 	return context.WithValue(ctx, keyPromClient, client)
 }
 
-func PromClient(ctx context.Context) *config.PromClient{
+func PromClient(ctx context.Context) *appclient.PromClient {
 	val := ctx.Value(keyPromClient)
 	if val == nil {
 		return nil
 	}
-	return val.(*config.PromClient)
+	return val.(*appclient.PromClient)
 }
 
 func WithK8SObjects(ctx context.Context, objects []runtime.Object) context.Context {
