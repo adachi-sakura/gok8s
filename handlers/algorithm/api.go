@@ -292,6 +292,7 @@ func loadContainerMemUsageMax(ctx context.Context, metrics *model.MicroserviceMe
 
 func buildMicroserviceYaml(ctx context.Context, deployment *appsv1.Deployment) (*model.MicroserviceYaml, error) {
 	yamlData := model.NewMicroserviceYaml()
+	yamlData.Name = deployment.Name
 	yamlData.Replicas = *deployment.Spec.Replicas
 	leastResponseTime := deployment.Labels[leastResponseTimeLabel]
 	if err := yamlData.SetLeastResponseTime(leastResponseTime); err != nil {

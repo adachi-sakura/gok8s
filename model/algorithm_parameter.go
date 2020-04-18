@@ -40,6 +40,7 @@ type (
 	}
 
 	MicroserviceYaml struct {
+		Name	string `json:"name"`
 		Replicas			int32	`json:"replicas"`
 		LeastResponseTime	float64	`json:"leastResponseTime"`
 		MicroservicesToInvoke []int	`json:"microservicesToInvoke"`
@@ -48,7 +49,6 @@ type (
 	MicroservcieData struct {
 		MicroserviceMetrics
 		MicroserviceYaml
-		Name	string `json:"name"`
 	}
 
 	AlgorithmParameters struct {
