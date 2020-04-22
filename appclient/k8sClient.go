@@ -34,11 +34,24 @@ func (cli *K8SClient) GetNode(name string) (*corev1.Node, error) {
 	return cli.K8SClient().CoreV1().Nodes().Get(name, metav1.GetOptions{})
 }
 
-func (cli *K8SClient) CreateDeployment(namespace string, deployment *appsv1.Deployment) (*appsv1.Deployment, error) {
+func (cli *K8SClient) CreateDeployment(deployment *appsv1.Deployment) (*appsv1.Deployment, error) {
+	namespace := deployment.Namespace
 	if namespace == "" {
 		namespace = metav1.NamespaceDefault
 	}
 	return cli.K8SClient().AppsV1().Deployments(namespace).Create(deployment)
+}
+
+func (cli *K8SClient) CreateDeployments(deployments []*appsv1.Deployment) ([]*appsv1.Deployment, error) {
+	createdDeployments := []*appsv1.Deployment{}
+	for _, deployment := range deployments {
+		createdDeployment, err := cli.CreateDeployment(deployment)
+		if err != nil {
+			return createdDeployments, err
+		}
+		createdDeployments = append(createdDeployments, createdDeployment)
+	}
+	return createdDeployments, nil
 }
 
 func (cli *K8SClient) ListLimitRange(namespace string) (*corev1.LimitRangeList, error) {

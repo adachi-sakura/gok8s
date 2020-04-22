@@ -35,7 +35,7 @@ func CreateDeployment(ctx context.Context) error {
 		return err
 	}
 	cli := appctx.NewK8SClient(ctx)
-	result, err := cli.CreateDeployment(deployment.Namespace, deployment)
+	result, err := cli.CreateDeployment(deployment)
 	if err != nil {
 		return err
 	}
