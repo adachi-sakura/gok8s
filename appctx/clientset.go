@@ -50,3 +50,7 @@ func PromClientContext(ctx context.Context) context.Context {
 	newCtx := WithPromClient(ctx, newCli)
 	return newCtx
 }
+
+func NewAlgorithmClient(ctx context.Context) *appclient.AlgorithmClient {
+	return appclient.NewAlgorithmClient()
+}
