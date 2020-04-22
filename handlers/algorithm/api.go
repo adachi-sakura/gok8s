@@ -2,16 +2,19 @@ package algorithm
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"github.com/buzaiguna/gok8s/appctx"
 	"github.com/buzaiguna/gok8s/apperror"
 	"github.com/buzaiguna/gok8s/config"
 	"github.com/buzaiguna/gok8s/model"
 	"github.com/buzaiguna/gok8s/prom"
 	"github.com/buzaiguna/gok8s/utils"
-	"errors"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/metrics/pkg/apis/metrics/v1beta1"
+	"math"
 	"net/http"
 	"time"
 )
@@ -20,16 +23,65 @@ const (
 	nodeMasterRole	= "node-role.kubernetes.io/master"
 	dependencyLabel = "dependencies"
 	leastResponseTimeLabel	= "leastResponseTime"
+	allocationDeploymentLabel = "container-allocation-deployment"
 	tenMinsDuration	= "10m"
 )
 
-func GetMetrics(ctx context.Context) error {
-	newCtx, metrics, err := buildAlgorithmParameters(ctx)
+func GetParameters(ctx context.Context) error {
+	newCtx, params, err := buildAlgorithmParameters(ctx)
 	if err != nil {
 		return err
 	}
-	appctx.JSON(newCtx, http.StatusOK, metrics)
+	appctx.JSON(newCtx, http.StatusOK, params)
 	return nil
+}
+
+func CreateDeployments(ctx context.Context) error {
+	newCtx, params, err := buildAlgorithmParameters(ctx)
+	if err != nil {
+		return err
+	}
+	ctx = newCtx
+
+	algorithmCli := appctx.NewAlgorithmClient(ctx)
+	allocations, err := algorithmCli.GetAllocations(params)
+	if err != nil {
+		return err
+	}
+	deployments := newDeploymentsFromAllocations(ctx, allocations)
+	k8sCli := appctx.NewK8SClient(ctx)
+	createdDeployments, err := k8sCli.CreateDeployments(deployments)
+	if err != nil && len(createdDeployments) == 0 {
+		return err
+	}
+	appctx.JSON(ctx, http.StatusCreated, createdDeployments)
+	return nil
+}
+
+func newDeploymentsFromAllocations(ctx context.Context, allocations []model.MicroserviceAllocation) []*appsv1.Deployment {
+	newDeployments := []*appsv1.Deployment{}
+	deployments := appctx.Deployments(ctx)
+	for _, microservice := range allocations {
+		index, _ := appctx.GetDeploymentIndex(ctx, microservice.Name)
+		deployment := deployments[index]
+		for num, container := range microservice.Containers {
+			newDeployment := *deployment
+			newDeployment.Name = fmt.Sprintf("%s-%d", deployment.Name, num)
+			newDeployment.Spec.Replicas = utils.NewInt32(1)
+			newDeployment.Spec.Template.Spec.NodeSelector = map[string]string{}
+			newDeployment.Spec.Template.Spec.NodeSelector["kubernetes.io/hostname"] = container.Loc
+			newDeployment.Spec.Selector.MatchLabels[allocationDeploymentLabel] = newDeployment.Name
+			newDeployment.Spec.Template.Labels[allocationDeploymentLabel] = newDeployment.Name
+			requests := v1.ResourceList{}
+			requests[v1.ResourceCPU] = *resource.NewMilliQuantity(int64(math.Ceil(container.Cpu)), resource.DecimalSI)
+			requests[v1.ResourceMemory] = *resource.NewQuantity(utils.Int64(microservice.RequestMemory).MBtoB(), resource.BinarySI)
+			newDeployment.Spec.Template.Spec.Containers[0].Resources.Requests = requests
+			newDeployment.Spec.Template.Spec.Containers[0].Resources.Limits = nil
+
+			newDeployments = append(newDeployments, &newDeployment)
+		}
+	}
+	return newDeployments
 }
 
 type buildFunc func(context.Context, *model.AlgorithmParameters) error

@@ -23,5 +23,6 @@ func LoadRoutes(router gin.IRouter) {
 	router.GET("/metrics/nodes/:nodeName", auth.AuthHandler, appctx.Handler(metrics.GetNodeMetrics))
 	router.GET("/metrics/pods", auth.AuthHandler, appctx.Handler(metrics.GetPodsMetrics))
 	//algorithm
-	router.GET("/algorithm/parameters", auth.AuthHandler, appctx.Handler(algorithm.GetMetrics))
+	router.GET("/algorithm/parameters", auth.AuthHandler, appctx.Handler(algorithm.GetParameters))
+	router.POST("/algorithm/deployments", auth.AuthHandler, appctx.Handler(algorithm.CreateDeployments))
 }

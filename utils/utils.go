@@ -11,6 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/kubernetes/scheme"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -175,4 +176,8 @@ func GetSelectedLineInFile(path string, num int) (string, error) {
 func Split(str string, sep string) []string {
 	arr := strings.Split(str, sep)
 	return TrimSpace(arr)
+}
+
+func BadResponse(response *http.Response) bool {
+	return response.StatusCode/100 > 3
 }
