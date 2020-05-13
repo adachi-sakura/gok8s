@@ -15,7 +15,7 @@ spec:
         app: container-allocation
     spec:
       containers:
-      - image: 192.168.2.112:5000/container-allocation:v0.2
+      - image: adachisakura/container-allocation
         imagePullPolicy: IfNotPresent
         name: container-allocation
         ports:
