@@ -69,7 +69,7 @@ func newDeploymentsFromAllocations(ctx context.Context, allocations []model.Micr
 			newDeployment.Name = fmt.Sprintf("%s-%d", deployment.Name, num)
 			newDeployment.Spec.Replicas = utils.NewInt32(1)
 			newDeployment.Spec.Template.Spec.NodeSelector = map[string]string{}
-			newDeployment.Spec.Template.Spec.NodeSelector["kubernetes.io/hostname"] = container.Loc
+			newDeployment.Spec.Template.Spec.NodeName = container.Loc
 			newDeployment.Spec.Selector.MatchLabels[allocationDeploymentLabel] = newDeployment.Name
 			newDeployment.Spec.Template.Labels[allocationDeploymentLabel] = newDeployment.Name
 			requests := v1.ResourceList{}
