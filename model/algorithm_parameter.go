@@ -1,8 +1,10 @@
 package model
 
 import (
+	"errors"
 	"github.com/buzaiguna/gok8s/utils"
 	v1 "k8s.io/api/core/v1"
+	"strconv"
 )
 
 type (
@@ -35,7 +37,7 @@ type (
 		Network
 		CpuUsageTime	float64 `json:"cpuUsageTime"`
 		CpuTimeTotal	float64	`json:"cpuTimeTotal"`
-		HttpRequestsCount	int	`json:"httpRequestCount"`
+		//HttpRequestsCount	int	`json:"httpRequestCount"`
 		MaxMemoryUsage	float64	`json:"maxMemoryUsage"`
 	}
 
@@ -44,6 +46,7 @@ type (
 		Replicas			int32	`json:"replicas"`
 		LeastResponseTime	float64	`json:"leastResponseTime"`
 		MicroservicesToInvoke []int	`json:"microservicesToInvoke"`
+		HttpRequestsCount	int	`json:"httpRequestCount"`
 	}
 
 	MicroservcieData struct {
@@ -89,6 +92,18 @@ func (this *MicroserviceYaml) SetLeastResponseTime(str string) error {
 	var err error
 	this.LeastResponseTime, err = utils.Float64(str)
 	return err
+}
+
+func (this *MicroserviceYaml) SetHttpRequestCount(str string) error {
+	if str == "" {
+		return errors.New("http request count can't be nil")
+	}
+	i, err := strconv.ParseInt(str, 10, 64)
+	if err != nil {
+		return err
+	}
+	this.HttpRequestsCount = int(i)
+	return nil
 }
 
 func NewLimitRange(limitRanges *v1.LimitRangeList) LimitRange {

@@ -24,6 +24,7 @@ const (
 	dependencyLabel = "dependencies"
 	leastResponseTimeLabel	= "leastResponseTime"
 	allocationDeploymentLabel = "container-allocation-deployment"
+	httpRequestCountLabel = "httpRequestCount"
 	tenMinsDuration	= "10m"
 )
 
@@ -255,7 +256,7 @@ func buildingMetricsPipeline() []promBuildFunc {
 		loadContainerReceiveTotal,
 		loadContainerTransmitTotal,
 		loadContainerCpuUsageSecTotal,
-		loadHttpRequestsTotal,
+		//loadHttpRequestsTotal,
 		loadContainerMemUsageMax,
 	}
 }
@@ -309,21 +310,21 @@ func loadContainerCpuUsageSecTotal(ctx context.Context, metrics *model.Microserv
 	return nil
 }
 
-func loadHttpRequestsTotal(ctx context.Context, metrics *model.MicroserviceMetrics, deployment *appsv1.Deployment, t time.Time) error {
-	cli := appctx.PromClient(ctx)
-	deployName := deployment.Name
-	duration := tenMinsDuration
-
-	res, err := cli.HttpRequestsTotal(deployName, t, duration)
-	if err != nil {
-		return err
-	}
-	matValues := prom.GetMatrixValues(res)
-	httpRequestsCount := int(prom.SumIncrement(matValues...))
-
-	metrics.HttpRequestsCount = httpRequestsCount
-	return nil
-}
+//func loadHttpRequestsTotal(ctx context.Context, metrics *model.MicroserviceMetrics, deployment *appsv1.Deployment, t time.Time) error {
+//	cli := appctx.PromClient(ctx)
+//	deployName := deployment.Name
+//	duration := tenMinsDuration
+//
+//	res, err := cli.HttpRequestsTotal(deployName, t, duration)
+//	if err != nil {
+//		return err
+//	}
+//	matValues := prom.GetMatrixValues(res)
+//	httpRequestsCount := int(prom.SumIncrement(matValues...))
+//
+//	metrics.HttpRequestsCount = httpRequestsCount
+//	return nil
+//}
 
 func loadContainerMemUsageMax(ctx context.Context, metrics *model.MicroserviceMetrics, deployment *appsv1.Deployment, t time.Time) error {
 	cli := appctx.PromClient(ctx)
@@ -346,11 +347,15 @@ func buildMicroserviceYaml(ctx context.Context, deployment *appsv1.Deployment) (
 	yamlData := model.NewMicroserviceYaml()
 	yamlData.Name = deployment.Name
 	yamlData.Replicas = *deployment.Spec.Replicas
-	leastResponseTime := deployment.Labels[leastResponseTimeLabel]
+	leastResponseTime := deployment.Annotations[leastResponseTimeLabel]
 	if err := yamlData.SetLeastResponseTime(leastResponseTime); err != nil {
 		return nil, err
 	}
-	dependencies := deployment.Labels[dependencyLabel]
+	httpRequestCount := deployment.Annotations[httpRequestCountLabel]
+	if err := yamlData.SetHttpRequestCount(httpRequestCount); err != nil {
+		return nil, err
+	}
+	dependencies := deployment.Annotations[dependencyLabel]
 	if dependencies != "" {
 		dependencyArr := utils.Split(dependencies, ",")
 		indexes, err := appctx.GetDeploymentsIndexes(ctx, dependencyArr...)
@@ -368,7 +373,7 @@ func validate(ctx context.Context) error {
 	dict := map[string]bool{}
 	//no duplicate deployment
 	for _, deployment := range deployments {
-		dependencies := deployment.Labels[dependencyLabel]
+		dependencies := deployment.Annotations[dependencyLabel]
 		deployName := deployment.Name
 		if _, exists := dict[deployName]; exists {
 			return apperror.NewInvalidRequestBodyError(errors.New("duplicate deployment name "+deployName))
