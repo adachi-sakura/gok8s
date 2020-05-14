@@ -22,7 +22,7 @@ var (
 	InClusterConfig	*rest.Config
 )
 
-func init() {
+func InitInClusterConfig() {
 	var err error
 	PROMETHEUS_HOST = os.Getenv("PROMETHEUS_SERVICE_HOST")
 	PROMETHEUS_PORT = os.Getenv("PROMETHEUS_SERVICE_PORT")

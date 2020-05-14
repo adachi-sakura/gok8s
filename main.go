@@ -1,8 +1,8 @@
 package main
 import (
 	"bytes"
-	"flag"
 	"encoding/json"
+	"flag"
 	"fmt"
 	cfg "github.com/buzaiguna/gok8s/config"
 	"github.com/buzaiguna/gok8s/handlers"
@@ -44,6 +44,7 @@ func init() {
 
 func main() {
 	cfg.InitBandwidth(bandWidthFileLine)
+	cfg.InitInClusterConfig()
 	listenAndServe()
 	config, err := rest.InClusterConfig()
 	if err != nil {

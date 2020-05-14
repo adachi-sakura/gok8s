@@ -17,7 +17,6 @@ const (
 	algorithmUrlBase = "http://%s:%s/algorithm"
 )
 
-var algorithmUrl string
 
 type AlgorithmClient struct {
 	client	*http.Client
@@ -29,8 +28,8 @@ func NewAlgorithmClient() *AlgorithmClient {
 	}
 }
 
-func init() {
-	algorithmUrl = fmt.Sprintf(algorithmUrlBase, cfg.ALGORITHM_HOST, cfg.ALGORITHM_PORT)
+func buildAlgorithmUrl() string {
+	return fmt.Sprintf(algorithmUrlBase, cfg.ALGORITHM_HOST, cfg.ALGORITHM_PORT)
 }
 
 func (cli *AlgorithmClient) GetAllocations(params *model.AlgorithmParameters) ([]model.MicroserviceAllocation, error) {
@@ -39,7 +38,7 @@ func (cli *AlgorithmClient) GetAllocations(params *model.AlgorithmParameters) ([
 		return nil, err
 	}
 
-	resp := cli.DoRequest(http.MethodGet, algorithmUrl, jsonBytes)
+	resp := cli.DoRequest(http.MethodGet, buildAlgorithmUrl(), jsonBytes)
 	defer resp.Body.Close()
 	if utils.BadResponse(resp) {
 		return nil, buildBadResponseError(resp)
