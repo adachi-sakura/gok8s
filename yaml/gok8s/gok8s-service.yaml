@@ -2,6 +2,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: gok8s
+  namespace: allocation
   labels:
     app: gok8s
 spec:

@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: gok8s
+  namespace: allocation
   labels:
     app: gok8s
 spec:
