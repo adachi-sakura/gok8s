@@ -15,9 +15,12 @@ spec:
         app: gok8s
     spec:
       containers:
-        - image: adachisakura/gok8s
+        - image: adachisakura/gok8s:1.0
           imagePullPolicy: IfNotPresent
           name: gok8s
+          command:
+            - ./gok8s
+            - --line=4
           env:
             - name:  PROMETHEUS_SERVICE_HOST
               valueFrom:

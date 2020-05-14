@@ -11,7 +11,6 @@ import (
 
 const (
 	bandwidthFilePath = "/config/result.csv"
-	lineRemoteVMTCP = 5
 )
 
 var (
@@ -29,14 +28,17 @@ func init() {
 	PROMETHEUS_PORT = os.Getenv("PROMETHEUS_SERVICE_PORT")
 	ALGORITHM_HOST = os.Getenv("CONTAINER_ALLOCATION_SERVICE_HOST")
 	ALGORITHM_PORT = os.Getenv("CONTAINER_ALLOCATION_SERVICE_PORT")
-	Bandwidth = getBandwidth()
 	if InClusterConfig, err = rest.InClusterConfig(); err != nil {
 		panic(err)
 	}
 }
 
-func getBandwidth() int {
-	str, err := utils.GetSelectedLineInFile(bandwidthFilePath, lineRemoteVMTCP)
+func InitBandwidth(line int) {
+	Bandwidth = getBandwidth(line)
+}
+
+func getBandwidth(line int) int {
+	str, err := utils.GetSelectedLineInFile(bandwidthFilePath, line)
 	if err != nil && err != io.EOF {
 		panic(err.Error())
 	}

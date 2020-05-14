@@ -1,6 +1,7 @@
 package main
 import (
 	"bytes"
+	"flag"
 	"encoding/json"
 	"fmt"
 	cfg "github.com/buzaiguna/gok8s/config"
@@ -32,7 +33,17 @@ const (
 	DefaultCmdConfigName = "kubernetes"
 )
 
+var (
+	bandWidthFileLine int
+)
+
+func init() {
+	flag.IntVar(&bandWidthFileLine, "line", 5, "the line where bandwidth value to be used in algorithm")
+	flag.Parse()
+}
+
 func main() {
+	cfg.InitBandwidth(bandWidthFileLine)
 	listenAndServe()
 	config, err := rest.InClusterConfig()
 	if err != nil {
