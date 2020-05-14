@@ -99,7 +99,7 @@ func ParseK8SYaml(fileR []byte) []runtime.Object {
 		fmt.Println(groupVersionKind)
 		if err != nil {
 			fmt.Printf("error occurred when decoding yaml file\n %s ", err.Error())
-			continue
+			panic(err)
 		}
 		retObj = append(retObj, obj)
 	}
