@@ -264,8 +264,9 @@ func buildingMetricsPipeline() []promBuildFunc {
 func loadContainerReceiveTotal(ctx context.Context, metrics *model.MicroserviceMetrics, deployment *appsv1.Deployment, t time.Time) error {
 	cli := appctx.PromClient(ctx)
 	deployName := deployment.Name
-	duration := tenMinsDuration
-	res, err := cli.ContainerReceiveTotal(deployName, t, duration)
+	containerName := deployment.Spec.Template.Spec.Containers[0].Name
+	duration := appctx.DefaultQuery(ctx, "duration", tenMinsDuration)
+	res, err := cli.ContainerReceiveTotal(deployName, containerName,t, duration)
 	if err != nil {
 		return err
 	}
@@ -279,8 +280,9 @@ func loadContainerReceiveTotal(ctx context.Context, metrics *model.MicroserviceM
 func loadContainerTransmitTotal(ctx context.Context, metrics *model.MicroserviceMetrics, deployment *appsv1.Deployment, t time.Time) error {
 	cli := appctx.PromClient(ctx)
 	deployName := deployment.Name
-	duration := tenMinsDuration
-	res, err := cli.ContainerTransmitTotal(deployName, t, duration)
+	containerName := deployment.Spec.Template.Spec.Containers[0].Name
+	duration := appctx.DefaultQuery(ctx, "duration", tenMinsDuration)
+	res, err := cli.ContainerTransmitTotal(deployName, containerName, t, duration)
 	if err != nil {
 		return err
 	}
@@ -294,7 +296,7 @@ func loadContainerTransmitTotal(ctx context.Context, metrics *model.Microservice
 func loadContainerCpuUsageSecTotal(ctx context.Context, metrics *model.MicroserviceMetrics, deployment *appsv1.Deployment, t time.Time) error {
 	cli := appctx.PromClient(ctx)
 	deployName := deployment.Name
-	duration := tenMinsDuration
+	duration := appctx.DefaultQuery(ctx, "duration", tenMinsDuration)
 	containerName := deployment.Spec.Template.Spec.Containers[0].Name
 
 	res, err := cli.ContainerCpuUsageSecTotal(deployName, containerName, t, duration)
@@ -313,9 +315,10 @@ func loadContainerCpuUsageSecTotal(ctx context.Context, metrics *model.Microserv
 //func loadHttpRequestsTotal(ctx context.Context, metrics *model.MicroserviceMetrics, deployment *appsv1.Deployment, t time.Time) error {
 //	cli := appctx.PromClient(ctx)
 //	deployName := deployment.Name
-//	duration := tenMinsDuration
+//	containerName := deployment.Spec.Template.Spec.Containers[0].Name
+//	duration := appctx.DefaultQuery(ctx, "duration", tenMinsDuration)
 //
-//	res, err := cli.HttpRequestsTotal(deployName, t, duration)
+//	res, err := cli.HttpRequestsTotal(deployName, containerName, t, duration)
 //	if err != nil {
 //		return err
 //	}
