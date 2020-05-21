@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: cpu-limits
-        image: 192.168.2.105:5000/centos
+        image: centos:7
         pullPolicy: IfNotPresent
         resources:
           requests:

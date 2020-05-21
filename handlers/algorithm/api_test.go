@@ -167,6 +167,17 @@ func dummyData() testData {
 	return testData{ctx, query}
 }
 
+func TestNodeSelect(t *testing.T) {
+	ctx := dummyData().ctx
+	deployments := appctx.Deployments(ctx)
+	deployment := deployments[0]
+	t.Logf("Before the select: %s\n", utils.Stringify(deployment.Spec.Template))
+	deployment.Spec.Template.Spec.NodeName = "worker1"
+	t.Logf("After the select: %s\n", utils.Stringify(deployment.Spec.Template))
+	if deployment.Spec.Template.Spec.NodeName != "worker1" {
+		t.Error("node select test failed")
+	}
+}
 
 func TestValidate(t *testing.T) {
 	ctx := dummyData().ctx

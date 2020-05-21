@@ -181,3 +181,11 @@ func Split(str string, sep string) []string {
 func BadResponse(response *http.Response) bool {
 	return response.StatusCode/100 > 3
 }
+
+func Stringify(obj interface{}) string {
+	str, err := json.MarshalIndent(obj, "", "\t")
+	if err != nil {
+		return fmt.Sprintf("%+v", obj)
+	}
+	return string(str)
+}
