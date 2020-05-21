@@ -1,6 +1,8 @@
 package config
 
 import (
+	"errors"
+	"fmt"
 	"github.com/buzaiguna/gok8s/utils"
 	"io"
 	"k8s.io/client-go/rest"
@@ -24,13 +26,21 @@ var (
 
 func InitInClusterConfig() {
 	var err error
-	PROMETHEUS_HOST = os.Getenv("PROMETHEUS_SERVICE_HOST")
-	PROMETHEUS_PORT = os.Getenv("PROMETHEUS_SERVICE_PORT")
-	ALGORITHM_HOST = os.Getenv("CONTAINER_ALLOCATION_SERVICE_HOST")
-	ALGORITHM_PORT = os.Getenv("CONTAINER_ALLOCATION_SERVICE_PORT")
+	PROMETHEUS_HOST = mustGetenv("PROMETHEUS_SERVICE_HOST")
+	PROMETHEUS_PORT = mustGetenv("PROMETHEUS_SERVICE_PORT")
+	ALGORITHM_HOST = mustGetenv("CONTAINER_ALLOCATION_SERVICE_HOST")
+	ALGORITHM_PORT = mustGetenv("CONTAINER_ALLOCATION_SERVICE_PORT")
 	if InClusterConfig, err = rest.InClusterConfig(); err != nil {
 		panic(err)
 	}
+}
+
+func mustGetenv(key string) string {
+	val := os.Getenv(key)
+	if val == "" {
+		panic(errors.New(fmt.Sprintf("ENV %s is not set", key)))
+	}
+	return val
 }
 
 func InitBandwidth(line int) {

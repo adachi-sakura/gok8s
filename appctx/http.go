@@ -53,3 +53,10 @@ func (body requestBody) yamlToJson() []byte {
 	}
 	return jsonBody
 }
+
+func DefaultQuery(ctx context.Context, key string, defaultValue string) string {
+	if v := Query(ctx, key); v != "" {
+		return v
+	}
+	return defaultValue
+}
