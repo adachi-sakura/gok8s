@@ -14,6 +14,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/metrics/pkg/apis/metrics/v1beta1"
+	"log"
 	"math"
 	"net/http"
 	"time"
@@ -49,6 +50,7 @@ func CreateDeployments(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	log.Printf("Optimized container allocation result:\n%v\n",allocations)
 	deployments := newDeploymentsFromAllocations(ctx, allocations)
 	k8sCli := appctx.NewK8SClient(ctx)
 	createdDeployments, err := k8sCli.CreateDeployments(deployments)

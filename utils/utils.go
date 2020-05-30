@@ -96,7 +96,6 @@ func ParseK8SYaml(fileR []byte) []runtime.Object {
 		}
 		decode := scheme.Codecs.UniversalDeserializer().Decode
 		obj, groupVersionKind, err := decode([]byte(file), nil, nil)
-		fmt.Println(groupVersionKind)
 		if err != nil {
 			fmt.Printf("error occurred when decoding yaml file\n %s ", err.Error())
 			panic(err)
