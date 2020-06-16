@@ -16,7 +16,7 @@ spec:
         app: gok8s
     spec:
       containers:
-        - image: adachisakura/gok8s:1.0
+        - image: adachisakura/gok8s:1.1
           imagePullPolicy: IfNotPresent
           name: gok8s
           command:
