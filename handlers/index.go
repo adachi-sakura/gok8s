@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"github.com/buzaiguna/gok8s/appctx"
+	"github.com/buzaiguna/gok8s/handlers/GAMSP"
 	"github.com/buzaiguna/gok8s/handlers/algorithm"
 	"github.com/buzaiguna/gok8s/handlers/auth"
 	"github.com/buzaiguna/gok8s/handlers/apiserver"
@@ -25,4 +26,7 @@ func LoadRoutes(router gin.IRouter) {
 	//algorithm
 	router.GET("/algorithm/parameters", auth.AuthHandler, appctx.Handler(algorithm.GetParameters))
 	router.POST("/algorithm/deployments", auth.AuthHandler, appctx.Handler(algorithm.CreateDeployments))
+	//GAMSP
+	router.POST("/GAMSP/nodes/labels", auth.AuthHandler, appctx.Handler(GAMSP.AnnotateNodes))
+	router.POST("/GAMSP/deployments", auth.AuthHandler, appctx.Handler(GAMSP.CreateDeployments))
 }
