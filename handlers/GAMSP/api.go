@@ -125,6 +125,7 @@ func CreateDeployments(ctx context.Context) error {
 	params := &model.GamspParameters{
 		Nodes:	nodes,
 	}
+	log.Println(params)
 
 	algorithmCli := appctx.NewAlgorithmClient(ctx)
 	allocations, err := algorithmCli.GetGamspAllocations(params)
