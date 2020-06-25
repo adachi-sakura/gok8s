@@ -32,16 +32,29 @@ func buildAlgorithmUrl() string {
 	return fmt.Sprintf(algorithmUrlBase, cfg.ALGORITHM_HOST, cfg.ALGORITHM_PORT)
 }
 
-func (cli *AlgorithmClient) GetAllocations(params *model.AlgorithmParameters) ([]model.MicroserviceAllocation, error) {
-	jsonBytes, err := json.Marshal(params)
+func (cli *AlgorithmClient) DoAndBind(reqBody interface{}, method string, url string, resp interface{}) error {
+	jsonBytes, err := json.Marshal(reqBody)
 	if err != nil {
+		return err
+	}
+
+	httpResp := cli.DoRequest(method, url, jsonBytes)
+	defer httpResp.Body.Close()
+	if utils.BadResponse(httpResp) {
+		return buildBadResponseError(httpResp)
+	}
+
+	body, _ := ioutil.ReadAll(httpResp.Body)
+	return json.Unmarshal(body, resp)
+}
+
+func (cli *AlgorithmClient) GetAllocations(params *model.AlgorithmParameters) ([]model.MicroserviceAllocation, error) {
+	allocations := []model.MicroserviceAllocation{}
+	if err := cli.DoAndBind(params, http.MethodGet, buildAlgorithmUrl(), &allocations); err != nil {
 		return nil, err
 	}
 
 	resp := cli.DoRequest(http.MethodGet, buildAlgorithmUrl(), jsonBytes)
-	defer resp.Body.Close()
-	if utils.BadResponse(resp) {
-		return nil, buildBadResponseError(resp)
 	}
 
 	body, _ := ioutil.ReadAll(resp.Body)
