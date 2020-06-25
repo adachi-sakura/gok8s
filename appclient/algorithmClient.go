@@ -54,14 +54,15 @@ func (cli *AlgorithmClient) GetAllocations(params *model.AlgorithmParameters) ([
 		return nil, err
 	}
 
-	resp := cli.DoRequest(http.MethodGet, buildAlgorithmUrl(), jsonBytes)
-	}
+	return allocations, nil
+}
 
-	body, _ := ioutil.ReadAll(resp.Body)
-	allocations := []model.MicroserviceAllocation{}
-	if err := json.Unmarshal(body, &allocations); err != nil {
+func (cli *AlgorithmClient) GetGamspAllocations(params *model.GamspParameters) ([]model.GamspAllocation, error) {
+	allocations := []model.GamspAllocation{}
+	if err := cli.DoAndBind(params, http.MethodGet, buildAlgorithmUrl(), &allocations); err != nil {
 		return nil, err
 	}
+
 	return allocations, nil
 }
 
