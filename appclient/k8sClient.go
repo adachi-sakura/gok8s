@@ -34,6 +34,10 @@ func (cli *K8SClient) GetNode(name string) (*corev1.Node, error) {
 	return cli.K8SClient().CoreV1().Nodes().Get(name, metav1.GetOptions{})
 }
 
+func (cli *K8SClient) UpdateNode(node *corev1.Node) (*corev1.Node, error) {
+	return cli.K8SClient().CoreV1().Nodes().Update(node)
+}
+
 func (cli *K8SClient) CreateDeployment(deployment *appsv1.Deployment) (*appsv1.Deployment, error) {
 	namespace := deployment.Namespace
 	if namespace == "" {
