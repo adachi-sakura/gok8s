@@ -95,7 +95,7 @@ func ParseK8SYaml(fileR []byte) []runtime.Object {
 			continue
 		}
 		decode := scheme.Codecs.UniversalDeserializer().Decode
-		obj, groupVersionKind, err := decode([]byte(file), nil, nil)
+		obj, _, err := decode([]byte(file), nil, nil)
 		if err != nil {
 			fmt.Printf("error occurred when decoding yaml file\n %s ", err.Error())
 			panic(err)
@@ -154,7 +154,13 @@ func (num Int64) BtoMB() int64 {
 	return int64(num/1024/1024)
 }
 
-
+func MustParseFloat64(str string) float64 {
+	num, err := strconv.ParseFloat(str, 64)
+	if err != nil {
+		panic(err)
+	}
+	return num
+}
 
 func GetSelectedLineInFile(path string, num int) (string, error) {
 	file, err := os.Open(path)
