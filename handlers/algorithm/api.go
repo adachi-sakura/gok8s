@@ -68,7 +68,7 @@ func newDeploymentsFromAllocations(ctx context.Context, allocations []model.Micr
 		index, _ := appctx.GetDeploymentIndex(ctx, microservice.Name)
 		deployment := deployments[index]
 		for num, container := range microservice.Containers {
-			newDeployment := *deployment
+			newDeployment := *deployment.DeepCopy()
 			newDeployment.Name = fmt.Sprintf("%s-%d", deployment.Name, num)
 			newDeployment.Spec.Replicas = utils.NewInt32(1)
 			newDeployment.Spec.Template.Spec.NodeSelector = map[string]string{}

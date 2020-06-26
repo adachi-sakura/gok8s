@@ -64,7 +64,7 @@ func buildMicroserviceDeployments(allocations []model.GamspAllocation) []*appsv1
 	deployments := []*appsv1.Deployment{}
 	for msNum, allocation := range allocations {
 		for instanceNum, pod := range allocation.Pods {
-			newDeployment := *templateDeployment
+			newDeployment := *templateDeployment.DeepCopy()
 			newDeployment.Name = fmt.Sprintf("%s-%d-%d", "ms", msNum, instanceNum)
 			newDeployment.Spec.Replicas = utils.NewInt32(1)
 			newDeployment.Spec.Template.Spec.NodeSelector = map[string]string{}
